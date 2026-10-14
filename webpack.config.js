@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 // const path = require('path');
 // const HtmlWebpackPlugin = require('html-webpack-plugin');
 const { CleanWebpackPlugin } = require("clean-webpack-plugin");
@@ -10,6 +12,17 @@ const gameRoot = process.cwd();
 const Webpack = require("webpack");
 const packageVersion = require("./package.json").version;
 const isEmbedBuild = process.env.STRUKTOG_EMBED_BUILD === "1";
+
+const site = require("./site.config.json");
+const requiredSiteFields = ["operatorName", "operatorAddress", "contactEmail", "siteUrl", "sourceUrl"];
+const siteConfigured = requiredSiteFields.every(key => typeof site[key] === "string" && site[key].trim());
+if (process.env.STRUKTOG_PUBLIC_BUILD === "1") {
+  if (!site.siteUrl || !site.sourceUrl) throw new Error("Set the public site and source URLs in site.config.json before a public build.");
+  for (const key of ["siteUrl", "sourceUrl", ...(site.projectUrl ? ["projectUrl"] : [])]) {
+    if (new URL(site[key]).protocol !== "https:") throw new Error(key + " must use HTTPS for public deployment.");
+  }
+  if (site.contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(site.contactEmail)) throw new Error("Set a valid contactEmail in site.config.json.");
+}
 
 function resolveBuildIdentifier() {
   if (process.env.CI_COMMIT_TAG) {
@@ -88,6 +101,15 @@ const config = {
   },
   plugins: [
     new Webpack.DefinePlugin({
+      __GOOGLE_DRIVE_CONFIG__: JSON.stringify({
+        clientId:
+          process.env.STRUKTOG_GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID || "",
+        apiKey:
+          process.env.STRUKTOG_GOOGLE_API_KEY || process.env.GOOGLE_API_KEY || "",
+        appId:
+          process.env.STRUKTOG_GOOGLE_APP_ID || process.env.GOOGLE_APP_ID || "",
+      }),
+      __SITE_CONFIG__: JSON.stringify(site),
       __COMMIT_HASH__: JSON.stringify(commitHash),
       __EMBED_BUILD__: JSON.stringify(isEmbedBuild),
     }),
@@ -104,8 +126,8 @@ const config = {
       chunkFilename: "[name].css",
     }),
     new HtmlWebpackPlugin({
-      title:
-        "Struktog – Struktogramme unterrichten & erstellen | ddi.education",
+      title: "Struktog – Diagrammeditor",
+      templateParameters: { site, siteConfigured },
       template: "./src/index.html",
       meta: {
         viewport: "width=device-width, initial-scale=1, user-scalable=no",
@@ -113,6 +135,12 @@ const config = {
         "theme-color": "#ffffff",
       },
     }),
+    ...["privacy", "imprint", "terms"].map(page => new HtmlWebpackPlugin({
+      filename: page + ".html",
+      template: "./src/legal.html",
+      inject: false,
+      templateParameters: { site, siteConfigured, page },
+    })),
     new CopyPlugin({
       patterns: ["./src/assets/examples/"],
       options: {
@@ -126,7 +154,7 @@ const config = {
     watchOptions: {
       poll: true,
     },
-    open: true,
+    open: false,
   },
 };
 
@@ -174,16 +202,8 @@ module.exports = (env, argv) => {
           clientsClaim: true,
           skipWaiting: true,
           cleanupOutdatedCaches: true,
-          navigateFallback: "/index.html",
-          runtimeCaching: [
-            {
-              urlPattern: /\/assets\/examples\/.*\.json$/,
-              handler: "NetworkFirst",
-              options: {
-                cacheName: "example-json-cache",
-              },
-            },
-          ],
+          navigateFallback: "./index.html",
+          runtimeCaching: [],
         })
       );
     }

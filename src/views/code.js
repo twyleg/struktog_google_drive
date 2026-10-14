@@ -1,3 +1,4 @@
+import { storage } from "../privacy/storage.js";
 /*
  Copyright (C) 2019-2023 Thiemo Leonhardt, Klaus Ramm, Tom-Maurice Schreiber, Sören Schwab
 
@@ -73,7 +74,7 @@ export class CodeView {
       "tooltip"
     );
     sourcecodeCopy.addEventListener("click", function (event) {
-      navigator.clipboard.writeText(localStorage.getItem("struktog_code"));
+      navigator.clipboard.writeText(storage.getItem("struktog_code"));
     });
 
     sourcecodeForm.appendChild(sourcecodeSelect);
@@ -101,13 +102,13 @@ export class CodeView {
     );
 
     if (typeof Storage !== "undefined") {
-      if ("displaySourcecode" in localStorage && "lang" in localStorage) {
-        const possibleLang = localStorage.lang;
+      if ("displaySourcecode" in storage && "lang" in storage) {
+        const possibleLang = storage.lang;
         if (possibleLang in this.translationMap) {
           this.lang = possibleLang;
           sourcecodeSelect.value = this.lang;
           this.presenter.setSourcecodeDisplay(
-            JSON.parse(localStorage.displaySourcecode)
+            JSON.parse(storage.displaySourcecode)
           );
           this.displaySourcecode("ToggleSourcecode");
         }
@@ -146,7 +147,7 @@ export class CodeView {
         codeBlock.appendChild(document.createTextNode(t("code.unsupported")));
       }
       const generatedCode = generateSourceCode(model, this.lang);
-      localStorage.setItem(
+      storage.setItem(
         "struktog_code",
         generatedCode.ok && generatedCode.supported
           ? generatedCode.code
@@ -177,8 +178,8 @@ export class CodeView {
 
   setLang(lang) {
     if (typeof Storage !== "undefined") {
-      localStorage.lang = lang;
-      localStorage.displaySourcecode = true;
+      storage.lang = lang;
+      storage.displaySourcecode = true;
     }
     const sourcecodeSelect = document.getElementById("SourcecodeSelect");
     if (sourcecodeSelect) {

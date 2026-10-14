@@ -1,3 +1,4 @@
+import { storage } from "../privacy/storage.js";
 /*
  Copyright (C) 2019-2023 Thiemo Leonhardt, Klaus Ramm, Tom-Maurice Schreiber, Sören Schwab
 
@@ -15,6 +16,7 @@
  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { validDiagram } from "../document/validate.js";
 import { guidGenerator } from "../helpers/generator";
 import {
   generateSourceCode,
@@ -61,30 +63,30 @@ export class Presenter {
     this.redoList = [];
 
     if (typeof Storage !== "undefined") {
-      if ("displaySourcecode" in localStorage) {
-        this.displaySourcecode = JSON.parse(localStorage.displaySourcecode);
+      if ("displaySourcecode" in storage) {
+        this.displaySourcecode = JSON.parse(storage.displaySourcecode);
       }
-      if ("lang" in localStorage) {
-        this.codeLanguage = localStorage.lang;
+      if ("lang" in storage) {
+        this.codeLanguage = storage.lang;
       }
-      if ("struktog_settings_shortcuts" in localStorage) {
+      if ("struktog_settings_shortcuts" in storage) {
         this.shortcutsEnabled = JSON.parse(
-          localStorage.struktog_settings_shortcuts
+          storage.struktog_settings_shortcuts
         );
       }
-      if ("struktog_settings_profile" in localStorage) {
-        this.activeConfigProfile = localStorage.struktog_settings_profile;
+      if ("struktog_settings_profile" in storage) {
+        this.activeConfigProfile = storage.struktog_settings_profile;
       }
-      if (getUiLanguageStorageKey() in localStorage) {
-        this.uiLanguage = localStorage[getUiLanguageStorageKey()];
+      if (getUiLanguageStorageKey() in storage) {
+        this.uiLanguage = storage[getUiLanguageStorageKey()];
         setUiLanguagePreference(this.uiLanguage, false);
       }
-      if (STRUCTOGRAM_NAME_STORAGE_KEY in localStorage) {
-        this.structogramName = localStorage[STRUCTOGRAM_NAME_STORAGE_KEY];
+      if (STRUCTOGRAM_NAME_STORAGE_KEY in storage) {
+        this.structogramName = storage[STRUCTOGRAM_NAME_STORAGE_KEY];
       }
-      if (FUNCTION_INSERT_RESTRICTION_STORAGE_KEY in localStorage) {
+      if (FUNCTION_INSERT_RESTRICTION_STORAGE_KEY in storage) {
         this.restrictFunctionInsertToTop = JSON.parse(
-          localStorage[FUNCTION_INSERT_RESTRICTION_STORAGE_KEY]
+          storage[FUNCTION_INSERT_RESTRICTION_STORAGE_KEY]
         );
       }
     }
@@ -103,6 +105,7 @@ export class Presenter {
   }
 
   emitExternalEvent(type, payload = {}) {
+    if (this.documents) this.documents.refresh();
     if (typeof this.externalEventHandler === "function") {
       this.externalEventHandler({ type, payload });
     }
@@ -139,7 +142,7 @@ export class Presenter {
 
     const structoNameNode = document.getElementById("structoName");
     if (structoNameNode) {
-      structoNameNode.innerHTML = normalizedName;
+      structoNameNode.textContent = normalizedName;
     }
 
     this.updateBrowserStore();
@@ -461,32 +464,32 @@ export class Presenter {
     }
 
     const settings = {};
-    if (!ignoreProfile && "struktog_settings_profile" in localStorage) {
-      settings.profile = localStorage.struktog_settings_profile;
+    if (!ignoreProfile && "struktog_settings_profile" in storage) {
+      settings.profile = storage.struktog_settings_profile;
     }
-    if (!ignoreProfile && "struktog_settings_elements" in localStorage) {
-      settings.elements = JSON.parse(localStorage.struktog_settings_elements);
+    if (!ignoreProfile && "struktog_settings_elements" in storage) {
+      settings.elements = JSON.parse(storage.struktog_settings_elements);
     }
-    if (!ignoreProfile && "struktog_settings_colors" in localStorage) {
-      settings.colors = JSON.parse(localStorage.struktog_settings_colors);
+    if (!ignoreProfile && "struktog_settings_colors" in storage) {
+      settings.colors = JSON.parse(storage.struktog_settings_colors);
     }
-    if (getUiLanguageStorageKey() in localStorage) {
-      settings.uiLanguage = localStorage[getUiLanguageStorageKey()];
+    if (getUiLanguageStorageKey() in storage) {
+      settings.uiLanguage = storage[getUiLanguageStorageKey()];
     }
-    if ("lang" in localStorage) {
-      settings.language = localStorage.lang;
+    if ("lang" in storage) {
+      settings.language = storage.lang;
     }
-    if ("displaySourcecode" in localStorage) {
-      settings.displaySourcecode = JSON.parse(localStorage.displaySourcecode);
+    if ("displaySourcecode" in storage) {
+      settings.displaySourcecode = JSON.parse(storage.displaySourcecode);
     }
-    if ("struktog_settings_shortcuts" in localStorage) {
+    if ("struktog_settings_shortcuts" in storage) {
       settings.shortcutsEnabled = JSON.parse(
-        localStorage.struktog_settings_shortcuts
+        storage.struktog_settings_shortcuts
       );
     }
-    if (FUNCTION_INSERT_RESTRICTION_STORAGE_KEY in localStorage) {
+    if (FUNCTION_INSERT_RESTRICTION_STORAGE_KEY in storage) {
       settings.restrictFunctionInsertToTop = JSON.parse(
-        localStorage[FUNCTION_INSERT_RESTRICTION_STORAGE_KEY]
+        storage[FUNCTION_INSERT_RESTRICTION_STORAGE_KEY]
       );
     }
 
@@ -508,16 +511,16 @@ export class Presenter {
       colorSettings[key] = config.get()[key].color;
     }
 
-    localStorage.struktog_settings_profile = this.activeConfigProfile;
-    localStorage.struktog_settings_elements = JSON.stringify(elementSettings);
-    localStorage.struktog_settings_colors = JSON.stringify(colorSettings);
-    localStorage.struktog_settings_shortcuts = JSON.stringify(
+    storage.struktog_settings_profile = this.activeConfigProfile;
+    storage.struktog_settings_elements = JSON.stringify(elementSettings);
+    storage.struktog_settings_colors = JSON.stringify(colorSettings);
+    storage.struktog_settings_shortcuts = JSON.stringify(
       this.shortcutsEnabled
     );
-    localStorage[FUNCTION_INSERT_RESTRICTION_STORAGE_KEY] = JSON.stringify(
+    storage[FUNCTION_INSERT_RESTRICTION_STORAGE_KEY] = JSON.stringify(
       this.restrictFunctionInsertToTop
     );
-    localStorage[getUiLanguageStorageKey()] = this.uiLanguage;
+    storage[getUiLanguageStorageKey()] = this.uiLanguage;
   }
 
   applySettings(settings, options = {}) {
@@ -527,7 +530,7 @@ export class Presenter {
       ...options,
     };
 
-    if (settings.profile && settings.profile in config.alternatives) {
+    if (settings.profile && Object.prototype.hasOwnProperty.call(config.alternatives, settings.profile)) {
       config.loadConfig(settings.profile);
       this.activeConfigProfile = settings.profile;
     }
@@ -624,9 +627,9 @@ export class Presenter {
     // check if browser supports web storage
     if (typeof Storage !== "undefined") {
       // update the model as stringified JSON data
-      localStorage.tree = JSON.stringify(this.model.getTree());
-      localStorage.displaySourcecode = this.displaySourcecode;
-      localStorage[STRUCTOGRAM_NAME_STORAGE_KEY] = this.structogramName;
+      storage.tree = JSON.stringify(this.model.getTree());
+      storage.displaySourcecode = this.displaySourcecode;
+      storage[STRUCTOGRAM_NAME_STORAGE_KEY] = this.structogramName;
     }
   }
 
@@ -1492,6 +1495,7 @@ export class Presenter {
   }
 
   resetModel() {
+    if (this.documents && this.documents.busy) return;
     this.updateUndo();
     this.model.reset();
     this.checkUndo();
@@ -1501,6 +1505,7 @@ export class Presenter {
     if (modal) {
       modal.classList.remove("active");
     }
+    if (this.documents) this.documents.loaded("new", this.getStructogramName());
     this.notifyTreeChanged("reset");
   }
 
@@ -2552,6 +2557,9 @@ export class Presenter {
   }
 
   applyImportedData(data, fallbackName = null) {
+    if (this.documents && this.documents.busy && !this.documents.applying)
+      return false;
+    if (!validDiagram(data)) return false;
     const importedData = this.normalizeImportedData(data);
     if (!importedData) {
       return false;
@@ -2581,11 +2589,18 @@ export class Presenter {
     this.checkUndo();
     this.renderAllViews();
     this.updateBrowserStore();
+    if (this.documents)
+      this.documents.loaded("local", fallbackName || this.getStructogramName());
     this.notifyTreeChanged("import");
     return true;
   }
 
   saveDialog() {
+    if (this.documents) return this.documents.save();
+    this.downloadLocal();
+  }
+
+  downloadLocal() {
     const exportPayload = this.getExportPayload();
     const structoName = exportPayload.meta.structoName;
 
@@ -2620,6 +2635,7 @@ export class Presenter {
    * Read input from a JSON file and replace the current model
    */
   readFile(event) {
+    if (this.documents && this.documents.busy) return;
     const file = event.target.files[0];
     if (!file) {
       return;
@@ -2641,11 +2657,20 @@ export class Presenter {
         return;
       }
 
+      if (
+        this.documents &&
+        this.documents.dirty() &&
+        !window.confirm(t("drive.discard"))
+      )
+        return;
       const isImported = this.applyImportedData(parsedData, fileName);
+      if (isImported && this.documents)
+        this.documents.loaded("local", file.name);
       if (!isImported) {
         window.alert(t("importExport.unknownImportFormat"));
       }
     };
+    reader.onerror = () => window.alert(t("importExport.invalidJson"));
     // start the reading process
     reader.readAsText(event.target.files[0]);
   }

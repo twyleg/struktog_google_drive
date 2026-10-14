@@ -1,3 +1,6 @@
+/* global __SITE_CONFIG__ */
+import { configureOfflineCache } from "./privacy/offline.js";
+import { openPrivacySettings } from "./privacy/ui.js";
 /*
  Copyright (C) 2019-2023 Thiemo Leonhardt, Klaus Ramm, Tom-Maurice Schreiber, Sören Schwab
 
@@ -15,6 +18,7 @@
  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { DocumentController } from "./document/controller.js";
 import "./assets/favicons/favicons";
 import { config } from "./config.js";
 import { model } from "./model/main";
@@ -55,13 +59,13 @@ function updateStructuredData(data) {
 }
 
 function updateDocumentMetadata() {
-  const title = t("meta.title");
+  const title = t("meta.title").replace(/ \| ddi\.education$/, "");
   const description = t("meta.description");
   const locale = t("meta.locale");
   const keywords = t("meta.keywords");
   const jsonLdLanguage = t("meta.jsonLdLanguage");
-  const canonicalUrl = "https://ddi.education/struktog";
-  const previewImageUrl = canonicalUrl + "/social-preview.svg";
+  const canonicalUrl = __SITE_CONFIG__.siteUrl || new URL("./", window.location.href).href;
+  const previewImageUrl = new URL("social-preview.svg", canonicalUrl.endsWith("/") ? canonicalUrl : canonicalUrl + "/").href;
 
   document.title = title;
   updateMetaTag('meta[name="description"]', "name", "description", description);
@@ -129,8 +133,8 @@ function updateDocumentMetadata() {
     },
     publisher: {
       "@type": "Organization",
-      name: "ddi.education",
-      url: "https://ddi.education",
+      name: __SITE_CONFIG__.operatorName || "Struktog",
+      url: canonicalUrl,
     },
     keywords,
     featureList: [
@@ -144,22 +148,7 @@ function updateDocumentMetadata() {
 }
 
 function registerServiceWorker() {
-  if (!("serviceWorker" in navigator)) {
-    return;
-  }
-
-  const isLocalhost =
-    window.location.hostname === "localhost" ||
-    window.location.hostname === "127.0.0.1";
-  const isSecureContext = window.location.protocol === "https:" || isLocalhost;
-
-  if (!isSecureContext) {
-    return;
-  }
-
-  navigator.serviceWorker.register("./sw.js").catch((error) => {
-    console.error("Service worker registration failed:", error);
-  });
+  configureOfflineCache().catch(error => console.error("Offline cache could not be updated", error));
 }
 
 function resolveAppMode() {
@@ -207,7 +196,6 @@ window.onload = function () {
       fetch(externJson)
         .then((response) => response.json())
         .then((json) => {
-          console.log(json);
           presenter.readUrl(json);
         });
     }
@@ -284,6 +272,10 @@ window.onload = function () {
       document.getElementById("editorDisplay")
     );
     presenter.addView(code);
+    presenter.documents = new DocumentController(
+      presenter,
+      __GOOGLE_DRIVE_CONFIG__
+    );
     const importExport = new ImportExport(
       presenter,
       document.getElementById("Export")
@@ -292,6 +284,7 @@ window.onload = function () {
 
     const webTour = new WebTour();
     webTour.bindTrigger("#tourInfoButton");
+    document.getElementById("privacy-settings-link").addEventListener("click", () => openPrivacySettings(presenter));
   } else {
     registerEmbedBridge(presenter);
   }
@@ -306,6 +299,8 @@ window.onload = function () {
   });
 
   presenter.init();
+  if (presenter.documents)
+    presenter.documents.loaded("new", presenter.getStructogramName());
 
   if (!isEmbedMode) {
     highlight();

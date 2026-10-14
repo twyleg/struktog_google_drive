@@ -4,3 +4,8 @@ build
 .vscode
 nohup.out
 OPENCODE_SESSION.md
+
+# Local environment configuration
+.env
+.env.*
+!.env.example

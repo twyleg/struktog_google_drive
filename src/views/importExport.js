@@ -14,6 +14,7 @@
  You should have received a copy of the GNU Affero General Public License
  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
+import { canCopyImage, copyImage } from "../helpers/imageClipboard";
 import * as htmlToImage from "html-to-image";
 import { config } from "../config";
 import {
@@ -31,76 +32,19 @@ export class ImportExport {
     this.preRender();
   }
 
-  render(model) {}
+  render(model) {
+    if (this.presenter.documents) this.presenter.documents.refresh();
+  }
 
   preRender() {
     const optionsTarget =
       document.getElementById("optionButtonsGroup") ||
       document.getElementById("optionButtons");
 
-    const infoDiv = document.createElement("div");
-    infoDiv.classList.add(
-      "options-element",
-      "infoIcon",
-      "tooltip",
-      "tooltip-bottom",
-      "hand"
-    );
-    infoDiv.id = "tourInfoButton";
-    infoDiv.setAttribute("data-tooltip", t("importExport.startTour"));
-    optionsTarget.appendChild(infoDiv);
-
-    const settingsDiv = document.createElement("div");
-    settingsDiv.classList.add(
-      "options-element",
-      "settingsToolbarIcon",
-      "tooltip",
-      "tooltip-bottom",
-      "hand"
-    );
-    settingsDiv.setAttribute("data-tooltip", t("importExport.settings"));
-    settingsDiv.addEventListener("click", () => this.openSettingsDialog());
-    optionsTarget.appendChild(settingsDiv);
-
-    const importDiv = document.createElement("div");
-    importDiv.classList.add(
-      "options-element",
-      "uploadIcon",
-      "tooltip",
-      "tooltip-bottom",
-      "hand"
-    );
-    importDiv.setAttribute("data-tooltip", t("importExport.load"));
-    const importInput = document.createElement("input");
-    importInput.setAttribute("type", "file");
-    importInput.addEventListener("change", (e) => this.presenter.readFile(e));
-    importDiv.addEventListener("click", () => importInput.click());
-    optionsTarget.appendChild(importDiv);
-
-    const saveDiv = document.createElement("div");
-    saveDiv.classList.add(
-      "options-element",
-      "saveIcon",
-      "tooltip",
-      "tooltip-bottom",
-      "hand"
-    );
-    saveDiv.setAttribute("data-tooltip", t("importExport.save"));
-    saveDiv.addEventListener("click", () => this.presenter.saveDialog());
-    optionsTarget.appendChild(saveDiv);
-
-    // right now only png export exists, in the future a dialog should be opened
-    const exportDiv = document.createElement("div");
-    exportDiv.classList.add(
-      "options-element",
-      "exportIcon",
-      "tooltip",
-      "tooltip-bottom",
-      "hand"
-    );
-    exportDiv.setAttribute("data-tooltip", t("importExport.imageExport"));
-    exportDiv.addEventListener("click", () => this.openImageExportDialog());
-    optionsTarget.appendChild(exportDiv);
+    this.presenter.documents.mount(optionsTarget, {
+      settings: () => this.openSettingsDialog(),
+      export: () => this.openImageExportDialog(),
+    });
 
     // ugly fix for HTMLToImage package
     // first creation of the image misses the lines in the image
@@ -1085,7 +1029,7 @@ export class ImportExport {
 
   openImageExportDialog() {
     const { content, footer } = this.clearModal();
-    footer.classList.add("settingsFooter");
+    footer.classList.add("settingsFooter", "imageExportFooter");
 
     const title = document.createElement("div");
     title.classList.add("settingsTitle");
@@ -1124,6 +1068,53 @@ export class ImportExport {
     });
     footer.appendChild(exportSvgButton);
 
+    const copyStatus = document.createElement("p");
+    copyStatus.setAttribute("role", "status");
+    copyStatus.setAttribute("aria-live", "polite");
+    content.appendChild(copyStatus);
+    const copyButtons = [];
+    for (const format of ["png", "svg"]) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.classList.add("modal-buttons", "settingsActionButton", "hand");
+      button.textContent = t(
+        format === "png" ? "importExport.copyPng" : "importExport.copySvg"
+      );
+      button.disabled = !canCopyImage(format);
+      button.addEventListener("click", async () => {
+        copyButtons.forEach((item) => {
+          item.disabled = true;
+        });
+        copyStatus.textContent = t("importExport.copyingImage");
+        try {
+          await copyImage(format, () => {
+            const node = document.getElementById("structogram");
+            return format === "png"
+              ? htmlToImage.toPng(node)
+              : htmlToImage.toSvg(node);
+          });
+          copyStatus.textContent = t("importExport.imageCopied");
+        } catch (error) {
+          copyStatus.textContent = t("importExport.imageCopyFailed");
+        } finally {
+          copyButtons.forEach((item, index) => {
+            item.disabled = !canCopyImage(index === 0 ? "png" : "svg");
+          });
+        }
+      });
+      copyButtons.push(button);
+      footer.appendChild(button);
+    }
+    if (!canCopyImage("png") || !canCopyImage("svg")) {
+      const hint = document.createElement("p");
+      hint.textContent = t(
+        !canCopyImage("png")
+          ? "importExport.clipboardUnavailable"
+          : "importExport.svgClipboardUnavailable"
+      );
+      content.appendChild(hint);
+    }
+
     const cancelButton = document.createElement("div");
     cancelButton.classList.add("modal-buttons", "settingsActionButton", "hand");
     cancelButton.appendChild(document.createTextNode(t("common.cancel")));
@@ -1138,7 +1129,7 @@ export class ImportExport {
   clearModal() {
     const content = document.getElementById("modal-content");
     const footer = document.getElementById("modal-footer");
-    footer.classList.remove("settingsFooter");
+    footer.classList.remove("settingsFooter", "imageExportFooter");
     while (content.hasChildNodes()) {
       content.removeChild(content.lastChild);
     }

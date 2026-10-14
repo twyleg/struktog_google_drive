@@ -1,3 +1,4 @@
+import { storage } from "../privacy/storage.js";
 /*
  Copyright (C) 2019-2023 Thiemo Leonhardt, Klaus Ramm, Tom-Maurice Schreiber, Sören Schwab
 
@@ -30,8 +31,8 @@ class Model {
 
     // check the web storage for old data
     if (typeof Storage !== "undefined") {
-      if ("tree" in localStorage) {
-        this.setTree(JSON.parse(localStorage.tree));
+      if ("tree" in storage) {
+        this.setTree(JSON.parse(storage.tree));
       }
     }
   }

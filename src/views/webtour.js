@@ -1,3 +1,4 @@
+import { storage } from "../privacy/storage.js";
 import { t } from "../i18n";
 
 export class WebTour {
@@ -84,12 +85,12 @@ export class WebTour {
     if (typeof Storage === "undefined") {
       return true;
     }
-    return localStorage.getItem(this.hintStorageKey) === "true";
+    return storage.getItem(this.hintStorageKey) === "true";
   }
 
   markHintSeen() {
     if (typeof Storage !== "undefined") {
-      localStorage.setItem(this.hintStorageKey, "true");
+      storage.setItem(this.hintStorageKey, "true");
     }
 
     const infoButton = document.getElementById("tourInfoButton");

@@ -145,30 +145,16 @@ strong {
 
 .nav-col-opt {
   flex-basis: 100%;
-  margin-top: 0.5em;
-}
-
-@media screen and (min-width: 731px) {
-  .nav-col-opt {
-    flex: auto;
-    margin: auto;
-  }
+  min-width: 0;
+  margin-top: 1em;
 }
 
 .options-container {
-  display: block;
-  text-align: right;
   width: 100%;
 }
 
 .optionButtonsGroup {
-  display: inline-flex;
-  align-items: center;
-  gap: 1.58em;
-  padding: 0.18em 0.3em;
-  border-radius: 0.45em;
-  background: var(--ui-group-bg);
-  margin-right: 1em;
+  margin: 0 .75em;
 }
 
 .options-element {
@@ -476,4 +462,11 @@ strong {
   .structoNameContainer {
     border-radius: 0.35em;
   }
+}
+
+.app-introduction {
+  margin: .5rem .75rem 0;
+  color: #607474;
+  font-size: .8rem;
+  line-height: 1.5;
 }

@@ -1,3 +1,4 @@
+/* global __SITE_CONFIG__ */
 /*
  Copyright (C) 2019-2023 Thiemo Leonhardt, Klaus Ramm, Tom-Maurice Schreiber, Sören Schwab
 
@@ -132,6 +133,11 @@ export function generateHtmltree(options = {}) {
   logoText.appendChild(document.createTextNode("Struktog."));
   logoAnker.appendChild(logoText);
 
+  const introduction = document.createElement("p");
+  introduction.className = "app-introduction";
+  introduction.textContent = t("privacy.appDescription");
+  section1.appendChild(introduction);
+
   const section2 = document.createElement("section");
   section2.classList.add("nav-col-opt");
   header.appendChild(section2);
@@ -242,20 +248,14 @@ export function generateFooter() {
     footerSpan.appendChild(document.createTextNode(" | "));
   }
 
-  const sourceLink = document.createElement("div");
+  const sourceLink = document.createElement("a");
   sourceLink.classList.add("hand", "tooltip", "tooltip-top");
   sourceLink.appendChild(document.createTextNode(t("footer.sourceCode")));
-  sourceLink.setAttribute(
-    "href",
-    "https://gitlab.com/dev-ddi/cs-school-tools/struktog"
-  );
-  sourceLink.setAttribute("data-tooltip", t("footer.sourceTooltip"));
-  sourceLink.addEventListener("click", () => {
-    window.open(
-      "https://gitlab.com/dev-ddi/cs-school-tools/struktog",
-      "_blank"
-    );
-  });
+  sourceLink.href = __SITE_CONFIG__.sourceUrl || "./terms.html#source";
+  sourceLink.target = "_blank";
+  sourceLink.rel = "noopener noreferrer";
+  sourceLink.classList.add("privacy-footer-link");
+  sourceLink.setAttribute("data-tooltip", t("footer.sourceCode"));
 
   const maintainer = document.createElement("div");
   maintainer.appendChild(document.createTextNode(t("footer.maintainer")));
@@ -293,14 +293,12 @@ export function generateFooter() {
     );
   });
 
-  const impressumLink = document.createElement("div");
-  impressumLink.classList.add("hand", "tooltip", "tooltip-top");
-  impressumLink.appendChild(document.createTextNode(t("footer.imprint")));
-  impressumLink.setAttribute("href", "https://ddi.education/impressum");
-  impressumLink.setAttribute("data-tooltip", t("footer.imprintTooltip"));
-  impressumLink.addEventListener("click", () => {
-    window.open("https://ddi.education/impressum/", "_blank");
-  });
+  const impressumLink = document.createElement("a");
+  impressumLink.classList.add("privacy-footer-link");
+  impressumLink.textContent = t("footer.imprint");
+  impressumLink.href = "./imprint.html";
+  impressumLink.target = "_blank";
+  impressumLink.rel = "noopener noreferrer";
 
   footerDiv.appendChild(footerSpan);
   footerSpan.appendChild(sourceLink);
@@ -312,6 +310,23 @@ export function generateFooter() {
   footerSpan.appendChild(hash);
   footerSpan.appendChild(document.createTextNode("|"));
   footerSpan.appendChild(impressumLink);
+  for (const [label, href] of [["privacy.footerPolicy", "./privacy.html"], ["privacy.footerTerms", "./terms.html"]]) {
+    footerSpan.appendChild(document.createTextNode("|"));
+    const link = document.createElement("a");
+    link.className = "privacy-footer-link";
+    link.textContent = t(label);
+    link.href = href;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    footerSpan.appendChild(link);
+  }
+  footerSpan.appendChild(document.createTextNode("|"));
+  const privacySettings = document.createElement("button");
+  privacySettings.type = "button";
+  privacySettings.id = "privacy-settings-link";
+  privacySettings.className = "privacy-footer-link";
+  privacySettings.textContent = t("privacy.footerSettings");
+  footerSpan.appendChild(privacySettings);
 }
 
 export function generateResetButton(presenter, domNode) {

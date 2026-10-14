@@ -3,12 +3,16 @@
   "version": "1.3.4",
   "description": "Webprogramm zur Erstellung von Struktogrammen sowie zur Umwandlung dessen in Code (Python, PHP, Javascript)",
   "scripts": {
-    "test": "npm run build && node test/buttontest.js",
+    "test": "npm run test:privacy && npm run test:drive && npm run test:clipboard && npm run build && node test/buttontest.js",
     "watch": "webpack serve",
     "build": "webpack --mode production",
     "build:embed": "STRUKTOG_EMBED_BUILD=1 webpack --mode production",
     "dev": "webpack --mode development",
-    "chromium": "webpack serve --open chromium"
+    "chromium": "webpack serve --open chromium",
+    "test:clipboard": "node --experimental-vm-modules test/imageClipboard.test.cjs",
+    "test:drive": "node --experimental-vm-modules test/drive.test.cjs",
+    "build:public": "STRUKTOG_PUBLIC_BUILD=1 webpack --mode production",
+    "test:privacy": "node --experimental-vm-modules test/privacy.test.cjs"
   },
   "repository": {
     "type": "git",
@@ -32,6 +36,7 @@
     "clean-webpack-plugin": "^4.0.0-alpha.0",
     "copy-webpack-plugin": "^11.0.0",
     "css-loader": "^5.2.4",
+    "dotenv": "^16.6.1",
     "eslint": "^8.25.0",
     "eslint-config-standard": "^17.0.0",
     "eslint-plugin-import": "^2.26.0",

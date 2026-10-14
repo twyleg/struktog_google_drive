@@ -10,70 +10,37 @@
     <meta name="keywords"
         content="Struktogramm, Nassi-Shneiderman-Diagramm, Informatikunterricht, Lehrerbildung, Open Source, Diagrammeditor, Codegenerierung">
     <meta property="og:title"
-        content="Struktog - Struktogramme erstellen und unterrichten | ddi.education">
+        content="Struktog - Struktogramme erstellen und unterrichten">
     <meta property="og:description"
         content="Struktog ist ein kostenloses Open-Source-Tool zum Erstellen von Struktogrammen für Informatikunterricht und Lehrerbildung.">
     <meta property="og:type"
         content="website">
     <meta property="og:url"
-        content="https://ddi.education/struktog">
+        content="<%- site.siteUrl || "./" %>">
     <meta property="og:site_name"
         content="Struktog">
     <meta property="og:locale"
         content="de_DE">
     <meta property="og:image"
-        content="https://ddi.education/struktog/social-preview.svg">
+        content="<%- site.siteUrl ? site.siteUrl.replace(/\/?$/, "/") + "social-preview.svg" : "./social-preview.svg" %>">
     <meta name="twitter:card"
         content="summary_large_image">
     <meta name="twitter:title"
-        content="Struktog - Struktogramme erstellen und unterrichten | ddi.education">
+        content="Struktog - Struktogramme erstellen und unterrichten">
     <meta name="twitter:description"
         content="Struktog ist ein kostenloses Open-Source-Tool zum Erstellen von Struktogrammen für Informatikunterricht und Lehrerbildung.">
     <meta name="twitter:image"
-        content="https://ddi.education/struktog/social-preview.svg">
+        content="<%- site.siteUrl ? site.siteUrl.replace(/\/?$/, "/") + "social-preview.svg" : "./social-preview.svg" %>">
     <title>
         <%= htmlWebpackPlugin.options.title %>
     </title>
-    <link rel="canonical" href="https://ddi.education/struktog">
+    <link rel="canonical" href="<%- site.siteUrl || "./" %>">
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="./favicon-16x16.png" />
     <link rel="manifest" href="./site.webmanifest" />
     <link rel="mask-icon" href="./safari-pinned-tab.svg" color="#264040" />
-    <script type="application/ld+json" data-structured-data="struktog">
-        {
-            "@context": "https://schema.org",
-            "@type": "WebApplication",
-            "name": "Struktog",
-            "alternateName": "Struktog Diagram Editor",
-            "url": "https://ddi.education/struktog",
-            "description": "Struktog ist ein kostenloses Open-Source-Tool zum Erstellen von Struktogrammen für Informatikunterricht und Lehrerbildung.",
-            "applicationCategory": "EducationalApplication",
-            "applicationSubCategory": "Diagram Editor",
-            "operatingSystem": "Web",
-            "browserRequirements": "Requires JavaScript and a modern web browser",
-            "inLanguage": "de",
-            "isAccessibleForFree": true,
-            "offers": {
-                "@type": "Offer",
-                "price": "0",
-                "priceCurrency": "EUR"
-            },
-            "publisher": {
-                "@type": "Organization",
-                "name": "ddi.education",
-                "url": "https://ddi.education"
-            },
-            "keywords": "Struktogramm, Nassi-Shneiderman-Diagramm, Informatikunterricht, Lehrerbildung, Open Source, Diagrammeditor, Codegenerierung",
-            "featureList": [
-                "Create Nassi-Shneiderman diagrams",
-                "Generate source code",
-                "Export diagrams as PNG and SVG",
-                "Save and load diagrams as JSON",
-                "Use in computer science education"
-            ]
-        }
-    </script>
+
 </head>
 
 <body>

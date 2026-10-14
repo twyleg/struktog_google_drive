@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="<%= siteConfigured ? 'index,follow' : 'noindex,nofollow' %>">
+  <title><%= page === 'privacy' ? 'Datenschutz / Privacy' : page === 'imprint' ? 'Impressum / Operator' : 'Nutzungsbedingungen / Terms' %> – Struktog</title>
+  <style>
+    body{margin:0;background:#fafafa;color:#264040;font:16px/1.65 system-ui,sans-serif}main{max-width:820px;margin:2rem auto;padding:1.5rem;background:white;border:1px solid #dce3e3;border-radius:.75rem}nav{display:flex;flex-wrap:wrap;gap:1rem;border-bottom:1px solid #dce3e3;padding-bottom:1rem}a{color:#27696a}h1{font-size:1.8rem}h2{font-size:1.2rem;margin-top:2rem}h3{font-size:1rem}address{font-style:normal;white-space:pre-line}.draft{padding:1rem;background:#fff3e8;color:#794017;border-radius:.4rem}.summary{padding:1rem;background:#edf3f3;border-radius:.4rem}footer{border-top:1px solid #dce3e3;margin-top:2rem;padding-top:1rem;font-size:.9rem}section{scroll-margin-top:1rem}@media(max-width:600px){main{margin:0;border-radius:0;padding:1rem}}:focus-visible{outline:2px solid #327f80;outline-offset:3px}
+  </style>
+</head>
+<body>
+<main>
+  <nav aria-label="Navigation">
+    <a href="./index.html">Zum Editor / Editor</a>
+    <a href="./privacy.html">Datenschutz / Privacy</a>
+    <a href="./imprint.html">Impressum / Operator</a>
+    <a href="./terms.html">Nutzungsbedingungen / Terms</a>
+    <a href="#english">English</a>
+  </nav>
+  <% if (!siteConfigured) { %>
+  <p class="draft" role="status">Entwurf: Die Betreiber- und Veröffentlichungsangaben sind noch nicht vollständig. Diese Seiten sind vor einer öffentlichen Bereitstellung zu vervollständigen und zu prüfen.<br><span lang="en">Draft: operator and deployment details are incomplete. Complete and review these pages before public deployment.</span></p>
+  <% } %>
+  <% if (site.projectUrl || site.sourceUrl) { %>
+  <p>Projekt, Quellcode und Kontaktmöglichkeiten / <span lang="en">Project, source and contact information</span>: <a href="<%- site.projectUrl || site.sourceUrl %>"><%- site.projectUrl || site.sourceUrl %></a></p>
+  <% } %>
+  <% if (page === 'imprint') { %>
+  <h1>Impressum</h1>
+  <% if (site.operatorName || site.operatorAddress || site.contactEmail) { %>
+  <p>Betreiber und Ansprechpartner für diese Bereitstellung:</p>
+  <address><strong><%- site.operatorName || 'Betreiber noch nicht angegeben' %></strong>
+<%- site.operatorAddress || 'Anschrift noch nicht angegeben' %></address>
+  <p>E-Mail: <% if (site.contactEmail) { %><a href="mailto:<%- site.contactEmail %>"><%- site.contactEmail %></a><% } else { %>Noch nicht angegeben<% } %></p>
+  <% } else { %>
+  <p>Es wurden keine persönlichen Betreiberangaben hinterlegt. Der Projektverweis oben ersetzt kein vollständiges Impressum.</p>
+  <% } %>
+  <p>Website: <% if (site.siteUrl) { %><a href="<%- site.siteUrl %>"><%- site.siteUrl %></a><% } else { %>Noch nicht angegeben<% } %></p>
+  <p>Struktog ist freie Software. Die ursprünglichen Autoren und das Projekt ddi.education sind nicht automatisch Betreiber dieser Bereitstellung. Projektinformationen und ursprüngliche Beiträge finden Sie im <a href="https://gitlab.com/dev-ddi/cs-school-tools/struktog">Originalprojekt</a>.</p>
+  <section id="english" lang="en">
+    <h2>Operator information</h2>
+    <p>The operator of this deployment is the person or organisation identified above. Contact them using the listed email address. Struktog’s original authors and ddi.education are not automatically the operator of this deployment.</p>
+  </section>
+  <% } else if (page === 'privacy') { %>
+  <h1>Datenschutzhinweise</h1>
+  <p>Stand: <%- site.privacyUpdated %></p>
+  <p class="summary">Der Editor funktioniert ohne Google Drive. Diagramme werden zunächst nur im aktuellen Tab verarbeitet. Dauerhafte Speicherung des Arbeitsbereichs und Offline-Nutzung sind getrennte, freiwillige Optionen unter „Browserdaten“. Google-Dienste werden erst nach Ihrer ausdrücklichen Aktivierung für diesen Tab geladen.</p>
+  <h2>1. Verantwortlicher und Kontakt</h2>
+  <p>Verantwortlich für diese Bereitstellung ist <strong><%- site.operatorName || 'der noch anzugebende Betreiber' %></strong>. Anschrift und Kontakt stehen im <a href="./imprint.html">Impressum</a>. Datenschutzanfragen richten Sie bitte an <% if (site.contactEmail) { %><a href="mailto:<%- site.contactEmail %>"><%- site.contactEmail %></a><% } else { %>den Projektverweis oben; vollständige Datenschutz-Kontaktdaten sind noch nicht hinterlegt<% } %>.</p>
+  <h2>2. Lokaler Editor und Browserdaten</h2>
+  <p>Diagramme, erzeugter Code und Einstellungen werden für die Bedienung im Arbeitsspeicher dieses Tabs verarbeitet. Es gibt in dieser Bereitstellung keine eingebundene Analyse- oder Werbefunktion. Der Betreiber erhält Ihre Diagramminhalte nicht durch die normale lokale Bearbeitung.</p>
+  <p>Wenn Sie unter „Browserdaten“ die Speicherung des Arbeitsbereichs aktivieren, werden Diagramm, erzeugter Code, Einstellungen, Tour-Status sowie Namen, IDs und bekannte Ordnerpfade zuletzt verwendeter Drive-Dateien in Local Storage dieses Browsers gespeichert. Diese Daten werden nicht an den Betreiber übertragen. Sie bleiben bis zur Löschung, zum Widerruf dieser Auswahl oder zur Löschung durch den Browser gespeichert. Andere Benutzer desselben Browserprofils könnten darauf zugreifen.</p>
+  <p>Die separate Offline-Option speichert öffentliche Programmdateien und Beispiel-Dateien im Browser-Cache. Dieser Offline-Cache enthält keine Google-Drive-Dokumente. Ohne Aktivierung registriert die aktuelle Version keinen neuen Offline-Service-Worker. Beim Deaktivieren werden der Service-Worker und die zugehörigen Cache-Dateien entfernt, soweit der Browser dies zulässt.</p>
+  <p>Ihre Speicher-Auswahl wird in einem separaten, notwendigen Präferenzdatensatz gespeichert, damit sie bei späteren Besuchen beachtet werden kann. Er bleibt bis zur Änderung oder Löschung der Website-Daten im Browser gespeichert. Freiwillige Speicherung und Offline-Nutzung beruhen auf Ihrer Einwilligung nach § 25 Abs. 1 TDDDG und, soweit personenbezogene Daten betroffen sind, Art. 6 Abs. 1 lit. a DSGVO. Die Speicherung der Auswahl dient ihrer Umsetzung (§ 25 Abs. 2 Nr. 2 TDDDG).</p>
+  <p>Sie können Ihre Auswahl jederzeit unter „Browserdaten“ ändern oder „Gespeicherte Daten löschen“ wählen. Das aktuelle Diagramm bleibt geöffnet. Ein Widerruf wirkt für die Zukunft und berührt die vorherige Rechtmäßigkeit nicht. Browser-Einstellungen können sämtliche Website-Daten einschließlich der Auswahl löschen.</p>
+  <h2 id="google">3. Google Drive – nur nach Aktivierung</h2>
+  <p>Vor dem ersten Drive-Vorgang in jedem Tab informiert ein Dialog über die Verbindung. Erst „Google Drive aktivieren“ lädt Google Identity Services und Google Picker. Dabei werden insbesondere IP-Adresse, Browser-/Geräteinformationen und technische Verbindungsdaten an Google übertragen. Google kann Cookies oder ähnliche Technologien einsetzen. Anbieter ist für Nutzer im Europäischen Wirtschaftsraum regelmäßig Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Irland; weitere Google-Gesellschaften können an der Verarbeitung beteiligt sein.</p>
+  <p>Die Google-Kontoberechtigung ist auf Dateien beschränkt, die Sie über die Anwendung auswählen oder erstellen (<code>drive.file</code>). Die Anwendung liest Datei- und Ordnerinformationen, um Öffnen, Speichern und Pfadanzeige zu ermöglichen. Beim Öffnen wird der Diagramminhalt aus Drive heruntergeladen; beim Speichern wird der aktuelle Inhalt an Google übertragen. Es erfolgt kein pauschaler Upload beim Aktivieren. Dateiinformationen erscheinen in der Liste zuletzt verwendeter Dateien; eine dauerhafte Speicherung dieser Liste erfolgt nur bei aktivierter Arbeitsbereich-Speicherung.</p>
+  <p>Google-Zugriffstoken liegen nur im Arbeitsspeicher dieses Tabs und werden nicht in Local Storage gespeichert. Die Aktivierungs-Einwilligung gilt nur für diesen Tab. Nach Speichern Ihres Diagramms beendet ein Neuladen die Aktivierung; eine neue Drive-Verbindung erfordert erneut die Aktivierung. Bereits gespeicherte Drive-Dateien bleiben in Ihrem Google-Konto, bis Sie sie dort löschen. Die Kontoberechtigung können Sie unter <a href="https://myaccount.google.com/connections">Google-Kontoverbindungen</a> widerrufen.</p>
+  <p>Die freiwillige Aktivierung erfolgt auf Grundlage Ihrer Einwilligung (Art. 6 Abs. 1 lit. a DSGVO; bei einwilligungspflichtigem Gerätezugriff § 25 Abs. 1 TDDDG). Google verarbeitet Daten zudem nach seinen eigenen Bedingungen. Informationen über Zwecke, Speicherdauer und Datenübermittlungen finden Sie in der <a href="https://policies.google.com/privacy">Google-Datenschutzerklärung</a>. Ein Abbruch des Aktivierungsdialogs lädt Google nicht, wenn Sie noch keine Aktivierung bestätigt haben. Nach einer bereits bestätigten Aktivierung beendet das Neuladen die Verbindung.</p>
+  <h2>4. Hosting durch GitHub Pages</h2>
+  <p>Bei der öffentlichen Bereitstellung über GitHub Pages wird die Website von GitHub ausgeliefert. GitHub protokolliert IP-Adressen von Besuchern zu Sicherheitszwecken, auch ohne GitHub-Anmeldung. Weitere technische Zugriffsdaten können nach den Bedingungen des Hosting-Anbieters verarbeitet werden. Der Betreiber nutzt die Bereitstellung und Sicherheitsfunktionen zur zuverlässigen und sicheren Auslieferung der Anwendung; die hierfür gewählte Grundlage ist Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse an sicherem Website-Betrieb).</p>
+  <p>GitHub, Inc. bzw. GitHub B.V. verarbeiten Hosting-Daten gemäß der <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub-Datenschutzerklärung</a>. Die Aufbewahrung der Anbieter-Protokolle richtet sich nach GitHubs dort beschriebenen Zwecken und Vorgaben; der Betreiber legt keine eigene Kopie dieser Protokolle an. Zu den protokollierten Zugriffen zählen auch Aufrufe der Rechts- und Datenschutzseiten.</p>
+  <h2>5. Übermittlungen außerhalb der EU und externe Links</h2>
+  <p>GitHub und Google können Daten außerhalb der EU/des EWR, insbesondere in den USA, verarbeiten. Ihre oben verlinkten Datenschutzerklärungen erläutern die jeweils eingesetzten Garantien, einschließlich des EU-US Data Privacy Framework, soweit anwendbar, und Standardvertragsklauseln. Diese Hosting- und Anbieterbedingungen sind vom Betreiber für seine konkrete Veröffentlichung zu prüfen.</p>
+  <p>Externe Links (z. B. Quellcode, Spenden oder Anbieter-Datenschutzseiten) öffnen die jeweilige externe Website erst nach Ihrer Betätigung. Deren eigene Datenschutzbedingungen gelten. Wird ein Diagramm über einen ausdrücklich aufgerufenen <code>?url=…</code>-Import geladen, kontaktiert der Browser die angegebene Quelle; sie erhält dabei technische Zugriffsdaten.</p>
+  <h2>6. Ihre Rechte</h2>
+  <p>Soweit die gesetzlichen Voraussetzungen vorliegen, haben Sie Rechte auf Auskunft, Berichtigung, Löschung, Einschränkung, Datenübertragbarkeit und Widerspruch gegen Verarbeitungen auf Grundlage berechtigter Interessen. Einwilligungen können Sie jederzeit für die Zukunft widerrufen. Sie haben das Recht auf Beschwerde bei einer Datenschutzaufsichtsbehörde. Kontaktieren Sie für Fragen zur Bereitstellung den Betreiber, für Anbieter-Verarbeitungen auch Google bzw. GitHub über deren Datenschutz-Kontaktwege.</p>
+  <section id="english" lang="en">
+    <h2>Privacy notice — English</h2>
+    <p>The controller of this deployment is <strong><%- site.operatorName || 'the operator, whose details still need to be provided' %></strong>, identified in the <a href="./imprint.html">operator information</a>. If no operator email is listed, refer to the GitHub project above for project information; full controller contact details remain incomplete. Updated: <%- site.privacyUpdated %>.</p>
+    <h3>Local editing and optional storage</h3>
+    <p>Without optional storage, diagrams, generated code and preferences stay in the current tab’s memory. This application does not include advertising or analytics. Normal local editing does not send diagram contents to the operator. Under “Browser data”, you can separately enable workspace storage and offline use. Workspace storage retains diagrams, code, preferences, tour status, and recent Drive file names, IDs and folder paths in this browser until deletion or withdrawal. People using the same browser profile may be able to access it. Offline use caches public application and example files, never Google Drive documents. A necessary preference record remembers your storage choices until you change them or clear site data.</p>
+    <p>Optional device storage is based on your consent under §25(1) TDDDG and, where personal data is involved, Article 6(1)(a) GDPR. The choice record implements your selection under §25(2)(2) TDDDG. You can withdraw these choices or delete saved data using “Browser data”; your current diagram stays open. Withdrawal does not affect the lawfulness of earlier processing.</p>
+    <h3>Optional Google Drive connection</h3>
+    <p>Google Identity Services and Picker load only after you select “Activate Google Drive” in this tab. Google receives your IP address, browser/device information and technical connection data and may use cookies or similar technologies. For EEA users, the provider is generally Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Ireland; other Google entities may participate. Activation is voluntary consent under Article 6(1)(a) GDPR and §25(1) TDDDG where device-access consent is required.</p>
+    <p>The app requests per-file <code>drive.file</code> permission. Opening downloads file contents; saving uploads the current diagram. Activation alone does not upload diagrams. File/folder information is used for opening, saving and path display; recent-file information is retained across visits only when workspace storage is enabled. Tokens stay in this tab’s memory. Save your work before reloading to end activation. Files already saved in Drive remain there until you delete them. Account permission can be withdrawn through <a href="https://myaccount.google.com/connections">Google account connections</a>. Google’s processing and retention are explained in its <a href="https://policies.google.com/privacy">privacy policy</a>.</p>
+    <h3>Hosting, transfers and links</h3>
+    <p>When deployed on GitHub Pages, GitHub serves the site and logs visitor IP addresses for security, including visits to these information pages. The operator’s basis for secure hosting is Article 6(1)(f) GDPR (legitimate interest in reliable and secure delivery). GitHub, Inc. or GitHub B.V. may process further technical access data and set provider retention periods according to the <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub privacy statement</a>; the operator does not keep a separate copy of those logs.</p>
+    <p>GitHub and Google may process data outside the EU/EEA, including in the US. Their linked policies describe applicable safeguards, including the EU-US Data Privacy Framework where applicable and standard contractual clauses. External links contact their destination when followed. An explicitly requested URL import contacts that source, which receives technical access data.</p>
+    <h3>Your rights</h3>
+    <p>Subject to applicable conditions, you have rights of access, correction, erasure, restriction, portability and objection to processing based on legitimate interests. You can withdraw consent prospectively and complain to a data protection supervisory authority. Contact the operator for this deployment’s processing and the respective provider for its own processing.</p>
+  </section>
+  <% } else { %>
+  <h1>Nutzungsbedingungen</h1>
+  <p>Struktog ist ein freier Editor für Struktogramme und erzeugten Quellcode. Diese Bereitstellung wird von <%- site.operatorName || 'dem noch anzugebenden Betreiber' %> angeboten. Kontaktinformationen stehen im <a href="./imprint.html">Impressum</a>.</p>
+  <h2>Diagramme und Speichern</h2>
+  <p>Prüfen Sie erzeugten Code und Diagramme vor der Verwendung. Laden Sie wichtige Arbeitsstände als lokale Datei herunter. Eine Wiederherstellung nach Schließen des Tabs setzt aktivierte Arbeitsbereich-Speicherung und weiterhin verfügbare Browserdaten voraus. Browser können Daten löschen. Der Betreiber garantiert weder eine ständige Verfügbarkeit der Website noch eine dauerhafte Aufbewahrung Ihrer Dateien.</p>
+  <p>Google Drive ist optional und unterliegt zusätzlich den Bedingungen Ihres Google-Kontos und den jeweiligen Datei-Berechtigungen. Speichern überschreibt die geöffnete Drive-Datei; „Speichern unter“ erstellt eine neue Datei im gewählten Ordner. Aktivieren Sie Google nur, wenn Sie der Übertragung zustimmen. Details stehen unter <a href="./privacy.html">Datenschutz</a>.</p>
+  <h2 id="source">Lizenz und Quellcode</h2>
+  <p>Die Software steht unter der <a href="https://www.gnu.org/licenses/agpl-3.0.html">GNU Affero General Public License, Version 3</a> oder einer späteren Version. Diese Nutzungsinformationen beschränken Ihre Rechte aus dieser Lizenz nicht. Für Gewährleistung und Haftung gelten die Lizenzbedingungen, soweit gesetzlich zulässig; zwingende gesetzliche Rechte bleiben unberührt.</p>
+  <% if (site.sourceUrl) { %><p>Quellcode dieser bereitgestellten Version: <a href="<%- site.sourceUrl %>"><%- site.sourceUrl %></a>.</p><% } else { %><p class="draft">Der Link zum vollständigen Quellcode dieser geänderten Version ist vor der Veröffentlichung noch einzutragen.</p><% } %>
+  <p>Ursprüngliches Projekt und Autoren: <a href="https://gitlab.com/dev-ddi/cs-school-tools/struktog">Struktog / ddi.education</a>. Urheber- und Lizenzhinweise im Quellcode bleiben erhalten.</p>
+  <section id="english" lang="en">
+    <h2>Terms of use — English</h2>
+    <p>Struktog is free software for editing structograms and generating code, provided in this deployment by the operator identified above. Review generated output before using it and download important work. Recovery after closing the tab requires enabled workspace storage and retained browser data. Availability and permanent retention are not guaranteed.</p>
+    <p>Google Drive is optional and subject to Google’s terms and file permissions. Saving updates the open Drive file; Save as creates a new file in the selected folder. The <a href="./privacy.html#english">privacy notice</a> describes data processing.</p>
+    <p>The software is licensed under GNU AGPL version 3 or later. These terms do not restrict your licence rights. The licence’s warranty and liability provisions apply to the extent permitted by law; mandatory statutory rights remain unaffected. The source link above must identify the complete source of this deployed version.</p>
+  </section>
+  <% } %>
+  <footer>Struktog · <a href="./index.html">Zum Editor / Return to editor</a></footer>
+</main>
+</body>
+</html>

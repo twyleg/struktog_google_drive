@@ -7,6 +7,7 @@ module.exports = {
     localStorage: true,
     FileReader: true,
     presenter: true,
+    __GOOGLE_DRIVE_CONFIG__: true,
     __COMMIT_HASH__: true
   }
 }
