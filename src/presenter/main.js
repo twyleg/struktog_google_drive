@@ -35,6 +35,7 @@ import {
 } from "../i18n";
 
 const STRUCTOGRAM_NAME_STORAGE_KEY = "struktog_structogram_name";
+const HEADLINE_STORAGE_KEY = "struktog_diagram_headline";
 const FUNCTION_INSERT_RESTRICTION_STORAGE_KEY =
   "struktog_settings_function_insert_top_only";
 
@@ -59,6 +60,7 @@ export class Presenter {
     this.activeConfigProfile = "standard";
     this.uiLanguage = getUiLanguagePreference();
     this.structogramName = t("nav.unnamed");
+    this.diagramHeadline = "";
     this.undoList = [];
     this.redoList = [];
 
@@ -84,6 +86,7 @@ export class Presenter {
       if (STRUCTOGRAM_NAME_STORAGE_KEY in storage) {
         this.structogramName = storage[STRUCTOGRAM_NAME_STORAGE_KEY];
       }
+      this.diagramHeadline = storage.getItem(HEADLINE_STORAGE_KEY) || "";
       if (FUNCTION_INSERT_RESTRICTION_STORAGE_KEY in storage) {
         this.restrictFunctionInsertToTop = JSON.parse(
           storage[FUNCTION_INSERT_RESTRICTION_STORAGE_KEY]
@@ -129,8 +132,8 @@ export class Presenter {
 
   getStructogramName() {
     const structoNameNode = document.getElementById("structoName");
-    if (structoNameNode && typeof structoNameNode.innerHTML === "string") {
-      return structoNameNode.innerHTML;
+    if (structoNameNode && typeof structoNameNode.textContent === "string") {
+      return structoNameNode.textContent;
     }
     return this.structogramName || t("nav.unnamed");
   }
@@ -146,11 +149,26 @@ export class Presenter {
     }
 
     this.updateBrowserStore();
+    if (this.documents) this.documents.refresh();
     this.emitExternalEvent("structogramMetaChanged", {
       structoName: normalizedName,
     });
 
     return normalizedName;
+  }
+
+  getDiagramHeadline() {
+    return this.diagramHeadline;
+  }
+
+  setDiagramHeadline(headline) {
+    this.diagramHeadline = typeof headline === "string" ? headline : "";
+    const input = document.getElementById("diagram-headline-input");
+    if (input && input.value !== this.diagramHeadline) input.value = this.diagramHeadline;
+    this.updateBrowserStore();
+    if (this.documents) this.documents.refresh();
+    this.emitExternalEvent("structogramMetaChanged", { headline: this.diagramHeadline });
+    return this.diagramHeadline;
   }
 
   getElementByUid(uid) {
@@ -630,7 +648,9 @@ export class Presenter {
       storage.tree = JSON.stringify(this.model.getTree());
       storage.displaySourcecode = this.displaySourcecode;
       storage[STRUCTOGRAM_NAME_STORAGE_KEY] = this.structogramName;
+      storage[HEADLINE_STORAGE_KEY] = this.diagramHeadline;
     }
+    if (this.documents) this.documents.persistWorkspace();
   }
 
   getMoveId() {
@@ -720,6 +740,7 @@ export class Presenter {
     for (const view of this.views) {
       view.render(this.model.getTree());
     }
+    this.refreshUndoControls();
     if (selectionChanged) {
       this.emitSelectionChanged();
     }
@@ -738,6 +759,7 @@ export class Presenter {
       this.updateBrowserStore();
     }
     this.setStructogramName(this.structogramName);
+    this.setDiagramHeadline(this.diagramHeadline);
     this.renderAllViews();
     this.emitExternalEvent("ready", {
       embedMode: this.embedMode,
@@ -2502,10 +2524,45 @@ export class Presenter {
       meta: {
         exportedAt: new Date().toISOString(),
         structoName,
+        headline: this.getDiagramHeadline(),
       },
       settings: this.getCurrentSettingsSnapshot(),
       tree: this.model.getTree(),
     };
+  }
+
+  captureDocument() {
+    return {
+      payload: JSON.parse(JSON.stringify(this.getExportPayload())),
+      undo: this.undoList.slice(),
+      redo: this.redoList.slice(),
+      selectedUid: this.selectedUid,
+    };
+  }
+
+  restoreDocument(snapshot) {
+    const payload = JSON.parse(JSON.stringify(snapshot.payload));
+    this.resetButtons();
+    this.reset();
+    this.model.setTree(payload.tree);
+    this.undoList = snapshot.undo.slice();
+    this.redoList = snapshot.redo.slice();
+    this.selectedUid = snapshot.selectedUid;
+    this.setStructogramName(payload.meta.structoName);
+    this.setDiagramHeadline(payload.meta.headline);
+
+    // Interface language belongs to the workspace, not to an individual tab.
+    this.applySettings({ ...payload.settings, uiLanguage: this.uiLanguage });
+    this.notifyTreeChanged("tab-switch");
+  }
+
+  refreshUndoControls() {
+    for (const node of document.getElementsByClassName("UndoIconButtonOverlay")) {
+      node.classList.toggle("disableIcon", this.undoList.length === 0);
+    }
+    for (const node of document.getElementsByClassName("RedoIconButtonOverlay")) {
+      node.classList.toggle("disableIcon", this.redoList.length === 0);
+    }
   }
 
   getCurrentSettingsSnapshot() {
@@ -2513,7 +2570,7 @@ export class Presenter {
     const colors = {};
     for (const key of this.getSettingsElementKeys()) {
       elements[key] = config.get()[key].use;
-      colors[key] = config.get()[key].color;
+      colors[key] = this.normalizeColorValue(config.get()[key].color) || config.get()[key].color;
     }
 
     return {
@@ -2560,6 +2617,9 @@ export class Presenter {
     if (this.documents && this.documents.busy && !this.documents.applying)
       return false;
     if (!validDiagram(data)) return false;
+    if (this.documents && !this.documents.applying) {
+      return this.documents.importDiagram(data, fallbackName);
+    }
     const importedData = this.normalizeImportedData(data);
     if (!importedData) {
       return false;
@@ -2573,8 +2633,18 @@ export class Presenter {
     if (structoName) {
       this.setStructogramName(structoName);
     }
+    // Older files have no headline; do not inherit one from the active tab.
+    this.setDiagramHeadline(importedData.meta && importedData.meta.headline);
 
-    this.updateUndo();
+    if (this.documents && this.documents.applying) {
+      this.resetButtons();
+      this.reset();
+      this.selectedUid = null;
+      this.undoList = [];
+      this.redoList = [];
+    } else {
+      this.updateUndo();
+    }
     this.model.setTree(importedData.tree);
 
     if (importedData.settings) {
@@ -2589,7 +2659,7 @@ export class Presenter {
     this.checkUndo();
     this.renderAllViews();
     this.updateBrowserStore();
-    if (this.documents)
+    if (this.documents && !this.documents.applying)
       this.documents.loaded("local", fallbackName || this.getStructogramName());
     this.notifyTreeChanged("import");
     return true;
@@ -2632,47 +2702,30 @@ export class Presenter {
   }
 
   /**
-   * Read input from a JSON file and replace the current model
+   * Read a JSON file into a separate document tab.
    */
-  readFile(event) {
+  async readFile(event) {
     if (this.documents && this.documents.busy) return;
-    const file = event.target.files[0];
-    if (!file) {
-      return;
-    }
-    let fileName = file.name;
-    const dashIndex = fileName.indexOf("-");
-    if (dashIndex !== -1) {
-      fileName = fileName.substring(0, dashIndex);
-    }
-    // create a FileReader instance
-    const reader = new FileReader();
-    // read file and parse JSON, then update model
-    reader.onload = (event) => {
+    // Snapshot FileList before the toolbar clears its input value.
+    const files = Array.from(event.target.files);
+    for (const file of files) {
       let parsedData;
       try {
-        parsedData = JSON.parse(event.target.result);
+        parsedData = JSON.parse(await file.text());
       } catch (error) {
         window.alert(t("importExport.invalidJson"));
-        return;
+        continue;
       }
 
-      if (
-        this.documents &&
-        this.documents.dirty() &&
-        !window.confirm(t("drive.discard"))
-      )
+      if (this.documents && this.documents.busy) {
+        window.alert(t("drive.working"));
         return;
-      const isImported = this.applyImportedData(parsedData, fileName);
-      if (isImported && this.documents)
-        this.documents.loaded("local", file.name);
+      }
+      const isImported = this.applyImportedData(parsedData, file.name);
       if (!isImported) {
         window.alert(t("importExport.unknownImportFormat"));
       }
-    };
-    reader.onerror = () => window.alert(t("importExport.invalidJson"));
-    // start the reading process
-    reader.readAsText(event.target.files[0]);
+    }
   }
 
   /**

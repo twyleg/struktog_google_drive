@@ -8,7 +8,7 @@ $font-stack: "Verdana", Geneva, sans-serif;
 
 header {
   margin-top: 0.5em;
-  width: min(100%, 1200px);
+  width: min(100%, 1400px);
   margin-left: auto;
   margin-right: auto;
 }
@@ -124,9 +124,11 @@ strong {
   flex-direction: row;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
+  gap: .75rem;
 
   a {
+    flex: 0 1 auto;
     text-decoration: none;
     margin-left: calc(0.5em + 2px);
   }
@@ -135,6 +137,40 @@ strong {
     padding-left: 1em;
     color: rgb(38, 64, 64);
     font-size: 1.5em;
+  }
+}
+
+.header-preferences {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: .5rem 1rem;
+  min-width: 0;
+  margin: 0 .75rem 0 auto;
+}
+
+.ui-language-control {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .4rem;
+  margin: 0;
+  font-size: .78rem;
+  color: #264040;
+
+  select {
+    max-width: 100%;
+    min-height: 2.5rem;
+    padding: .4rem .5rem;
+    border: 1px solid #b4c5c5;
+    border-radius: .45rem;
+    background: white;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+
+    &:focus-visible { outline: 2px solid #327f80; outline-offset: 2px; }
   }
 }
 
@@ -151,6 +187,7 @@ strong {
 
 .options-container {
   width: 100%;
+  container: document-toolbar / inline-size;
 }
 
 .optionButtonsGroup {
@@ -470,3 +507,5 @@ strong {
   font-size: .8rem;
   line-height: 1.5;
 }
+
+@import "theme";

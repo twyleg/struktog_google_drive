@@ -49,7 +49,7 @@ export class ImportExport {
     // ugly fix for HTMLToImage package
     // first creation of the image misses the lines in the image
     htmlToImage
-      .toPng(document.getElementById("structogram"))
+      .toPng(document.getElementById("structogram"), { style: { filter: "none" } })
       .then(function (dataUrl) {});
   }
 
@@ -973,37 +973,81 @@ export class ImportExport {
     linkElement.click();
   }
 
-  /**
-   * Create a PNG file of the current model with htmtToImage and append a button for downloading
-   */
-  exportAsPngWithPackage() {
-    htmlToImage
-      .toPng(document.getElementById("structogram"))
-      .then((dataUrl) => {
-        const linkElement = document.createElement("a");
-        linkElement.setAttribute("href", dataUrl);
-        const exportFileDefaultName = this.buildImageExportFileName("png");
-        linkElement.setAttribute("download", exportFileDefaultName);
-        linkElement.click();
-      })
-      .catch(function (error) {
-        console.error("oops, something went wrong!", error);
-      });
+  async renderExportSvg(border = 1) {
+    // Render once as SVG so preview, downloads and clipboard share the same
+    // white artboard and outer margin, independently of the editor theme.
+    const node = document.getElementById("structogram");
+    const diagramName = this.presenter.getDiagramHeadline();
+    const source = await htmlToImage.toSvg(node, {
+      backgroundColor: "#ffffff",
+      style: { filter: "none", color: "black", colorScheme: "light", margin: "0" },
+    });
+    const svg = new DOMParser().parseFromString(decodeURIComponent(source.split(",")[1]), "image/svg+xml").documentElement;
+    const width = Number(svg.getAttribute("width"));
+    const height = Number(svg.getAttribute("height"));
+    const context = document.createElement("canvas").getContext("2d");
+    context.font = "bold 16px sans-serif";
+    const lines = this.wrapExportTitle(diagramName, width, context);
+    const titleHeight = lines.length ? lines.length * 22 + 8 : 0;
+    const ns = "http://www.w3.org/2000/svg";
+    const artboard = document.createElementNS(ns, "svg");
+    artboard.setAttribute("width", width + 2 * border);
+    artboard.setAttribute("height", height + titleHeight + 2 * border);
+    const background = document.createElementNS(ns, "rect");
+    background.setAttribute("width", "100%");
+    background.setAttribute("height", "100%");
+    background.setAttribute("fill", "white");
+    svg.setAttribute("x", border);
+    svg.setAttribute("y", border + titleHeight);
+    const title = document.createElementNS(ns, "text");
+    title.setAttribute("font-family", "sans-serif");
+    title.setAttribute("font-size", "16");
+    title.setAttribute("font-weight", "700");
+    title.setAttribute("fill", "black");
+    lines.forEach((line, index) => {
+      const span = document.createElementNS(ns, "tspan");
+      span.setAttribute("x", border);
+      span.setAttribute("y", border + 17 + index * 22);
+      span.textContent = line;
+      title.appendChild(span);
+    });
+    artboard.append(background, title, svg);
+    return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(new XMLSerializer().serializeToString(artboard));
   }
 
-  exportAsSvgWithPackage() {
-    htmlToImage
-      .toSvg(document.getElementById("structogram"))
-      .then((dataUrl) => {
-        const linkElement = document.createElement("a");
-        linkElement.setAttribute("href", dataUrl);
-        const exportFileDefaultName = this.buildImageExportFileName("svg");
-        linkElement.setAttribute("download", exportFileDefaultName);
-        linkElement.click();
-      })
-      .catch(function (error) {
-        console.error("oops, something went wrong!", error);
-      });
+  wrapExportTitle(name, width, context) {
+    const lines = [];
+    let line = "";
+    for (const word of name.trim().split(/\s+/)) {
+      const candidate = line ? line + " " + word : word;
+      if (context.measureText(candidate).width <= width) { line = candidate; continue; }
+      if (line) lines.push(line);
+      line = "";
+      // Split long unbroken names too, so the heading stays inside the image.
+      for (const character of word) {
+        if (line && context.measureText(line + character).width > width) {
+          lines.push(line);
+          line = "";
+        }
+        line += character;
+      }
+    }
+    if (line) lines.push(line);
+    return lines;
+  }
+
+  async rasterizeExportSvg(dataUrl) {
+    const image = new Image();
+    await new Promise((resolve, reject) => {
+      image.onload = resolve;
+      image.onerror = reject;
+      image.src = dataUrl;
+    });
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    canvas.getContext("2d").drawImage(image, 0, 0);
+    return canvas.toDataURL("image/png");
   }
 
   buildImageExportFileName(extension) {
@@ -1015,7 +1059,7 @@ export class ImportExport {
     minutes = minutes < 10 ? "0" + minutes : minutes;
 
     const timeString = hours + "-" + minutes;
-    const structoName = document.getElementById("structoName").innerHTML;
+    const structoName = document.getElementById("structoName").textContent;
     return (
       structoName +
       "-" +
@@ -1029,104 +1073,194 @@ export class ImportExport {
 
   openImageExportDialog() {
     const { content, footer } = this.clearModal();
-    footer.classList.add("settingsFooter", "imageExportFooter");
+    const modal = document.getElementById("IEModal");
+    modal.classList.add("image-export-modal");
+    footer.classList.add("imageExportFooter");
 
-    const title = document.createElement("div");
-    title.classList.add("settingsTitle");
-    title.appendChild(
-      document.createTextNode(t("importExport.imageExportFormatTitle"))
-    );
-    content.appendChild(title);
+    const title = document.createElement("h2");
+    title.className = "settingsTitle";
+    title.textContent = t("importExport.imageExport");
+    const preview = document.createElement("div");
+    preview.className = "image-export-preview";
+    preview.setAttribute("aria-busy", "true");
+    const image = document.createElement("img");
+    image.alt = t("importExport.exportPreview");
+    image.hidden = true;
+    preview.appendChild(image);
+    const appearance = document.createElement("p");
+    appearance.className = "image-export-appearance";
+    appearance.textContent = t("importExport.exportLightAppearance");
+    const fields = document.createElement("div");
+    fields.className = "image-export-fields";
+    const nameLabel = document.createElement("label");
+    nameLabel.htmlFor = "image-export-name";
+    nameLabel.textContent = t("toolbar.fileName");
+    const name = document.createElement("input");
+    name.id = "image-export-name";
+    name.value = this.buildImageExportFileName("png").replace(/\.png$/i, "");
+    nameLabel.appendChild(name);
+    const formatLabel = document.createElement("label");
+    formatLabel.htmlFor = "image-export-format";
+    formatLabel.textContent = t("importExport.exportFormat");
+    const format = document.createElement("select");
+    format.id = "image-export-format";
+    for (const value of ["png", "svg"]) {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = value.toUpperCase();
+      format.appendChild(option);
+    }
+    formatLabel.appendChild(format);
+    const borderLabel = document.createElement("label");
+    borderLabel.className = "image-export-border";
+    borderLabel.htmlFor = "image-export-border";
+    borderLabel.textContent = t("importExport.exportBorder");
+    const border = document.createElement("input");
+    border.id = "image-export-border";
+    border.type = "number";
+    border.min = "0";
+    border.max = "1000";
+    border.step = "1";
+    border.value = "1";
+    border.title = t("importExport.exportBorderHint");
+    borderLabel.appendChild(border);
+    fields.append(nameLabel, formatLabel, borderLabel);
+    const status = document.createElement("p");
+    status.className = "image-export-status";
+    status.setAttribute("role", "status");
+    status.setAttribute("aria-live", "polite");
+    status.textContent = t("importExport.exportPreparing");
+    content.append(title, preview, appearance, fields, status);
 
-    const exportPngButton = document.createElement("div");
-    exportPngButton.classList.add(
-      "modal-buttons",
-      "settingsActionButton",
-      "hand"
-    );
-    exportPngButton.appendChild(
-      document.createTextNode(t("importExport.exportPng"))
-    );
-    exportPngButton.addEventListener("click", () => {
-      document.getElementById("IEModal").classList.remove("active");
-      this.exportAsPngWithPackage();
-    });
-    footer.appendChild(exportPngButton);
-
-    const exportSvgButton = document.createElement("div");
-    exportSvgButton.classList.add(
-      "modal-buttons",
-      "settingsActionButton",
-      "hand"
-    );
-    exportSvgButton.appendChild(
-      document.createTextNode(t("importExport.exportSvg"))
-    );
-    exportSvgButton.addEventListener("click", () => {
-      document.getElementById("IEModal").classList.remove("active");
-      this.exportAsSvgWithPackage();
-    });
-    footer.appendChild(exportSvgButton);
-
-    const copyStatus = document.createElement("p");
-    copyStatus.setAttribute("role", "status");
-    copyStatus.setAttribute("aria-live", "polite");
-    content.appendChild(copyStatus);
-    const copyButtons = [];
-    for (const format of ["png", "svg"]) {
+    const save = document.createElement("button");
+    save.type = "button";
+    save.className = "document-button document-button-primary";
+    save.textContent = t("importExport.exportSaveAs");
+    save.disabled = true;
+    const copyButtons = new Map();
+    for (const type of ["png", "svg"]) {
       const button = document.createElement("button");
       button.type = "button";
-      button.classList.add("modal-buttons", "settingsActionButton", "hand");
-      button.textContent = t(
-        format === "png" ? "importExport.copyPng" : "importExport.copySvg"
-      );
-      button.disabled = !canCopyImage(format);
-      button.addEventListener("click", async () => {
-        copyButtons.forEach((item) => {
-          item.disabled = true;
+      button.className = "document-button";
+      button.textContent = t(type === "png" ? "importExport.copyPng" : "importExport.copySvg");
+      button.disabled = true;
+      copyButtons.set(type, button);
+    }
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "document-button";
+    close.textContent = t("importExport.exportClose");
+    close.addEventListener("click", () => modal.classList.remove("active"));
+    footer.append(save, ...copyButtons.values(), close);
+    let ready = false;
+    let busy = false;
+    const validBorder = () => border.value !== "" && border.checkValidity();
+    const refreshButtons = () => {
+      save.disabled = !ready || busy || !validBorder();
+      for (const [type, button] of copyButtons) button.disabled = !ready || busy || !validBorder() || !canCopyImage(type);
+      border.disabled = busy;
+    };
+    const images = new Map();
+    let cachedBorder = null;
+    const render = (type) => {
+      const margin = Number(border.value);
+      if (cachedBorder !== margin) { images.clear(); cachedBorder = margin; }
+      const key = type + ":" + margin;
+      if (!images.has(key)) {
+        const source = type === "svg"
+          ? this.renderExportSvg(margin)
+          : render("svg").then((svg) => this.rasterizeExportSvg(svg));
+        const rendering = source.catch((error) => {
+          if (images.get(key) === rendering) images.delete(key);
+          throw error;
         });
-        copyStatus.textContent = t("importExport.copyingImage");
+        images.set(key, rendering);
+      }
+      return images.get(key);
+    };
+    save.addEventListener("click", async () => {
+      if (!name.value.trim()) { name.focus(); return; }
+      const extension = format.value;
+      const filename = name.value.trim().replace(/\.(png|svg)$/i, "") + "." + extension;
+      busy = true;
+      refreshButtons();
+      status.textContent = t("importExport.exportPreparing");
+      try {
+        const dataUrl = await render(extension);
+        const link = document.createElement("a");
+        link.href = dataUrl;
+        link.download = filename;
+        link.click();
+        status.textContent = t("importExport.exportSaved");
+      } catch (error) {
+        status.textContent = t("importExport.exportFailed");
+      } finally {
+        busy = false;
+        refreshButtons();
+      }
+    });
+    for (const [type, button] of copyButtons) {
+      button.addEventListener("click", async () => {
+        busy = true;
+        refreshButtons();
+        status.textContent = t("importExport.copyingImage");
         try {
-          await copyImage(format, () => {
-            const node = document.getElementById("structogram");
-            return format === "png"
-              ? htmlToImage.toPng(node)
-              : htmlToImage.toSvg(node);
-          });
-          copyStatus.textContent = t("importExport.imageCopied");
+          // Start clipboard.write during the gesture, including in Safari.
+          await copyImage(type, () => render(type));
+          status.textContent = t("importExport.imageCopied");
         } catch (error) {
-          copyStatus.textContent = t("importExport.imageCopyFailed");
+          status.textContent = t("importExport.imageCopyFailed");
         } finally {
-          copyButtons.forEach((item, index) => {
-            item.disabled = !canCopyImage(index === 0 ? "png" : "svg");
-          });
+          busy = false;
+          refreshButtons();
         }
       });
-      copyButtons.push(button);
-      footer.appendChild(button);
     }
-    if (!canCopyImage("png") || !canCopyImage("svg")) {
-      const hint = document.createElement("p");
-      hint.textContent = t(
-        !canCopyImage("png")
-          ? "importExport.clipboardUnavailable"
-          : "importExport.svgClipboardUnavailable"
-      );
-      content.appendChild(hint);
-    }
-
-    const cancelButton = document.createElement("div");
-    cancelButton.classList.add("modal-buttons", "settingsActionButton", "hand");
-    cancelButton.appendChild(document.createTextNode(t("common.cancel")));
-    cancelButton.addEventListener("click", () =>
-      document.getElementById("IEModal").classList.remove("active")
-    );
-    footer.appendChild(cancelButton);
-
-    document.getElementById("IEModal").classList.add("active");
+    modal.classList.add("active");
+    let previewVersion = 0;
+    let previewTimer;
+    const updatePreview = async () => {
+      const version = ++previewVersion;
+      ready = false;
+      refreshButtons();
+      if (!validBorder()) {
+        status.textContent = t("importExport.exportBorderInvalid");
+        preview.setAttribute("aria-busy", "false");
+        return;
+      }
+      preview.setAttribute("aria-busy", "true");
+      status.textContent = t("importExport.exportPreparing");
+      try {
+        const dataUrl = await render("png");
+        if (version !== previewVersion) return;
+        image.src = dataUrl;
+        image.hidden = false;
+        ready = true;
+        status.textContent = !canCopyImage("png")
+          ? t("importExport.clipboardUnavailable")
+          : !canCopyImage("svg") ? t("importExport.svgClipboardUnavailable") : "";
+      } catch (error) {
+        if (version === previewVersion) status.textContent = t("importExport.exportFailed");
+      } finally {
+        if (version === previewVersion) {
+          preview.setAttribute("aria-busy", "false");
+          refreshButtons();
+        }
+      }
+    };
+    border.addEventListener("input", () => {
+      // Disable immediately and debounce rendering while a value is being typed.
+      ++previewVersion;
+      ready = false;
+      refreshButtons();
+      clearTimeout(previewTimer);
+      previewTimer = setTimeout(updatePreview, 200);
+    });
+    updatePreview();
   }
 
   clearModal() {
+    document.getElementById("IEModal").classList.remove("image-export-modal");
     const content = document.getElementById("modal-content");
     const footer = document.getElementById("modal-footer");
     footer.classList.remove("settingsFooter", "imageExportFooter");
@@ -1565,8 +1699,6 @@ export class ImportExport {
         return;
       }
 
-      const previousUiLanguage = this.presenter.getUiLanguage();
-
       this.presenter.applySettings({
         profile: profileSelect.value,
         elements: elementSettings,
@@ -1578,9 +1710,6 @@ export class ImportExport {
         restrictFunctionInsertToTop: functionInsertCheckbox.checked,
       });
       document.getElementById("IEModal").classList.remove("active");
-      if (uiLanguageSelect.value !== previousUiLanguage) {
-        window.location.reload();
-      }
     });
 
     footer.appendChild(saveButton);

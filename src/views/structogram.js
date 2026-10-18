@@ -149,9 +149,22 @@ export class Structogram {
 
     const divEditorHeadline = document.createElement("div");
     divEditorHeadline.classList.add("columnEditorFull", "headerContainer");
-    const editorHeadline = document.createElement("strong");
-    editorHeadline.classList.add("margin-small", "floatBottom");
-    editorHeadline.appendChild(document.createTextNode(t("editor.heading")));
+    const editorHeadline = document.createElement("input");
+    editorHeadline.type = "text";
+    editorHeadline.id = "diagram-headline-input";
+    editorHeadline.className = "diagram-headline-input";
+    editorHeadline.value = this.presenter.getDiagramHeadline();
+    editorHeadline.setAttribute("aria-label", t("editor.headline"));
+    editorHeadline.placeholder = t("editor.headline");
+    editorHeadline.addEventListener("input", () => {
+      this.presenter.setDiagramHeadline(editorHeadline.value);
+    });
+    editorHeadline.addEventListener("blur", () => {
+      editorHeadline.value = this.presenter.setDiagramHeadline(editorHeadline.value);
+    });
+    editorHeadline.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") { event.preventDefault(); editorHeadline.blur(); }
+    });
     divEditorHeadline.appendChild(editorHeadline);
 
     const optionsContainer1 = document.createElement("div");
@@ -235,6 +248,7 @@ export class Structogram {
     const spanHeader = document.createElement("strong");
     spanHeader.classList.add("margin-small");
     spanHeader.appendChild(document.createTextNode(t("editor.chooseElement")));
+    spanHeader.dataset.i18n = "editor.chooseElement";
     divHeader.appendChild(spanHeader);
     divInsert.appendChild(divHeader);
 
@@ -318,6 +332,7 @@ export class Structogram {
       "hand"
     );
     undo.setAttribute("data-tooltip", t("common.undo"));
+    undo.dataset.i18nTooltip = "common.undo";
     domNode.appendChild(undo);
     const undoOverlay = document.createElement("div");
     undoOverlay.classList.add(
@@ -338,6 +353,7 @@ export class Structogram {
       "hand"
     );
     redo.setAttribute("data-tooltip", t("common.redo"));
+    redo.dataset.i18nTooltip = "common.redo";
     domNode.appendChild(redo);
     const redoOverlay = document.createElement("div");
     redoOverlay.classList.add(
@@ -360,6 +376,7 @@ export class Structogram {
       "tooltip-bottom"
     );
     div.style.backgroundColor = config.get()[button].color;
+    div.classList.toggle("monochrome-element", config.isMonochrome());
     div.id = config.get()[button].id;
     const shortcutLabel = this.getShortcutLabel(div.id);
     const buttonLabel = getNodeLabel(button);
@@ -406,7 +423,14 @@ export class Structogram {
   }
 
   render(tree) {
+    const title = document.getElementById("diagram-headline-input");
+    if (title) {
+      title.setAttribute("aria-label", t("editor.headline"));
+      title.placeholder = t("editor.headline");
+    }
+    this.domRoot.classList.toggle("monochrome-diagram", config.isMonochrome());
     this.refreshInsertButtons();
+    this.updateEditorWidthToggleButtons();
     const restrictFunctionInsertToTop =
       this.presenter.getSettingFunctionMode() &&
       this.presenter.getRestrictFunctionInsertToTop();

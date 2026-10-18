@@ -1,6 +1,8 @@
 /* global __SITE_CONFIG__ */
 import { configureOfflineCache } from "./privacy/offline.js";
 import { openPrivacySettings } from "./privacy/ui.js";
+import { mountLanguageSelector } from "./helpers/languageSelector";
+import { initializeTheme, mountThemeSelector } from "./helpers/theme";
 /*
  Copyright (C) 2019-2023 Thiemo Leonhardt, Klaus Ramm, Tom-Maurice Schreiber, Sören Schwab
 
@@ -33,9 +35,11 @@ import {
   generateHtmltree,
   highlight,
 } from "./helpers/generator";
-import { initializeI18n, t } from "./i18n";
+import { getUiLanguage, initializeI18n, refreshPageTranslations, t } from "./i18n";
 
 import "./assets/scss/structog.scss";
+
+initializeTheme();
 
 function updateMetaTag(selector, attributeName, attributeValue, content) {
   let tag = document.head.querySelector(selector);
@@ -59,6 +63,7 @@ function updateStructuredData(data) {
 }
 
 function updateDocumentMetadata() {
+  document.documentElement.lang = getUiLanguage();
   const title = t("meta.title").replace(/ \| ddi\.education$/, "");
   const description = t("meta.description");
   const locale = t("meta.locale");
@@ -218,7 +223,9 @@ window.onload = function () {
         "footerDonateLink"
       );
       donateLink.appendChild(document.createTextNode(t("nav.donate")));
+      donateLink.dataset.i18n = "nav.donate";
       donateLink.setAttribute("data-tooltip", t("nav.donateTooltip"));
+      donateLink.dataset.i18nTooltip = "nav.donateTooltip";
       donateLink.addEventListener("click", () => {
         window.open(
           "https://www.paypal.com/donate?hosted_button_id=5ZRTXH9NUJG5U",
@@ -233,9 +240,14 @@ window.onload = function () {
 
   // create presenter object
   const presenter = new Presenter(model, { embedMode: isEmbedMode });
+  let refreshLanguageSelector = () => {};
+  let refreshThemeSelector = () => {};
   presenter.setExternalEventHandler((event) => {
     if (event && event.type === "uiLanguageChanged") {
       updateDocumentMetadata();
+      refreshPageTranslations();
+      refreshLanguageSelector();
+      refreshThemeSelector();
     }
   });
   // TODO: this should not be necessary, but some functions depend on moveId and nextInsertElement
@@ -299,8 +311,14 @@ window.onload = function () {
   });
 
   presenter.init();
-  if (presenter.documents)
+  if (!isEmbedMode) {
+    refreshLanguageSelector = mountLanguageSelector(presenter);
+    refreshThemeSelector = mountThemeSelector();
+  }
+  if (presenter.documents) {
     presenter.documents.loaded("new", presenter.getStructogramName());
+    presenter.documents.restoreWorkspace();
+  }
 
   if (!isEmbedMode) {
     highlight();

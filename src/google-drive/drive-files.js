@@ -104,6 +104,19 @@ export class DriveFiles {
     }
   }
 
+  async createFolder (name, parentId) {
+    if (typeof name !== 'string' || !name.trim()) throw new Error(t('toolbar.folderNameRequired'))
+    if (typeof parentId !== 'string' || !parentId.trim()) throw new Error(t('toolbar.invalidFolder'))
+    const response = await this.request(`${BASE}?fields=${FIELDS}&supportsAllDrives=true`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+      body: JSON.stringify({ name: name.trim(), mimeType: 'application/vnd.google-apps.folder', parents: [parentId] })
+    })
+    const folder = await response.json()
+    if (typeof folder.id !== 'string' || !folder.id.trim()) throw new Error(t('toolbar.invalidFolder'))
+    return folder
+  }
+
   async create (name, content, parentId = null) {
     const metadata = { name, mimeType: 'application/json' }
     if (parentId !== null) {

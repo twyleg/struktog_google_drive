@@ -5,6 +5,8 @@ import { GoogleAuth } from '../google-drive/auth.js'
 import { initializePicker, pickFile, pickFolder } from '../google-drive/picker.js'
 import { DriveFiles } from '../google-drive/drive-files.js'
 import { DocumentState } from './state.js'
+import { DocumentTabs } from './tabs.js'
+import { validDiagram } from './validate.js'
 import { t } from '../i18n.js'
 
 export class DocumentController {
@@ -17,6 +19,10 @@ export class DocumentController {
     this.busy = false
     this.buttons = []
     this.current = new DocumentState('new', presenter.getStructogramName(), presenter.getExportPayload())
+    this.tabSequence = 0
+    this.tabs = [this.createTab(this.current)]
+    this.activeTabId = this.tabs[0].id
+    this.initialized = false
     this.activated = false
     this.ready = false
   }
@@ -67,6 +73,7 @@ export class DocumentController {
     const input = document.createElement('input')
     input.type = 'file'
     input.accept = '.json,application/json'
+    input.multiple = true
     input.hidden = true
     input.addEventListener('change', event => {
       this.presenter.readFile(event)
@@ -123,12 +130,14 @@ export class DocumentController {
     this.cancelWaitButton.className = 'document-button document-cancel-wait'
     this.cancelWaitButton.addEventListener('click', () => this.cancelGoogleWait())
     statusRow.appendChild(this.cancelWaitButton)
-    group.appendChild(statusRow)
+    const fileStatus = document.getElementById('document-file-status') || group
+    fileStatus.appendChild(statusRow)
     this.errorMessage = document.createElement('div')
     this.errorMessage.className = 'document-error'
     this.errorMessage.setAttribute('role', 'alert')
-    group.appendChild(this.errorMessage)
+    fileStatus.appendChild(this.errorMessage)
     target.appendChild(group)
+    this.tabView = new DocumentTabs(this, document.getElementById('document-tabs-host') || target)
     document.addEventListener('click', event => {
       if (!this.driveMenu.contains(event.target)) this.closeRecent()
     })
@@ -149,7 +158,8 @@ export class DocumentController {
       }
     })
     window.addEventListener('beforeunload', event => {
-      if (this.dirty() || this.busy) {
+      this.persistWorkspace()
+      if (this.hasUnsavedChanges() || this.busy) {
         event.preventDefault()
         event.returnValue = ''
       }
@@ -160,6 +170,11 @@ export class DocumentController {
   dirty () { return this.current.isDirty(this.presenter.getExportPayload()) }
 
   refresh () {
+    if (this.transitioning) return
+    const active = this.activeTab()
+    if (active) active.document = this.current
+    if (this.current.source === 'new') this.current.name = this.presenter.getStructogramName()
+    if (this.tabView) this.tabView.render()
     if (!this.status) return
     for (const button of this.buttons) {
       const label = t('toolbar.' + button.dataset.label)
@@ -189,10 +204,152 @@ export class DocumentController {
   }
 
   newDiagram () {
-    if (this.busy || (this.dirty() && !window.confirm(t('toolbar.discardNew')))) return
-    this.presenter.resetModel()
-    this.presenter.setStructogramName(t('nav.unnamed'))
-    this.loaded('new', this.presenter.getStructogramName())
+    if (this.busy) return
+    const payload = JSON.parse(JSON.stringify(this.presenter.getExportPayload()))
+    payload.meta.structoName = t('nav.unnamed')
+    payload.meta.headline = ''
+    payload.tree = { id: crypto.randomUUID(), type: 'InsertNode', followElement: { type: 'Placeholder' } }
+    this.importDiagram(payload, t('nav.unnamed'), 'new')
+  }
+
+  createTab (state, snapshot = null) {
+    return { id: String(++this.tabSequence), document: state, snapshot, dirty: snapshot ? state.isDirty(snapshot.payload) : false }
+  }
+
+  activeTab () { return this.tabs.find(tab => tab.id === this.activeTabId) }
+
+  captureActive () {
+    const tab = this.activeTab()
+    if (!tab) return
+    tab.document = this.current
+    tab.snapshot = this.presenter.captureDocument()
+    tab.dirty = tab.document.isDirty(tab.snapshot.payload)
+  }
+
+  hasUnsavedChanges () {
+    return this.tabs.some(tab => tab.id === this.activeTabId
+      ? this.dirty()
+      : tab.dirty)
+  }
+
+  activateTab (id, internal = false) {
+    if ((this.busy && !internal) || this.transitioning || id === this.activeTabId) return
+    const tab = this.tabs.find(tab => tab.id === id)
+    if (!tab) return
+    this.commitEditor()
+    this.captureActive()
+    this.transitioning = true
+    try {
+      this.activeTabId = id
+      this.current = tab.document
+      this.presenter.restoreDocument(tab.snapshot)
+      this.error = ''
+    } finally {
+      this.transitioning = false
+      this.refresh()
+      this.persistWorkspace()
+    }
+  }
+
+  commitEditor () {
+    if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur()
+    }
+  }
+
+  importDiagram (data, name, source = 'local', file = null) {
+    if (!validDiagram(data)) return false
+    this.commitEditor()
+    this.captureActive()
+    const previous = this.activeTab()
+    const next = this.createTab(this.current)
+    // Only replace the initial, untouched empty placeholder.
+    const replaceEmpty = source !== 'new' && this.tabs.length === 1 &&
+      this.current.source === 'new' && !this.dirty() &&
+      previous.snapshot.payload.tree.type === 'InsertNode' &&
+      previous.snapshot.payload.tree.followElement?.type === 'Placeholder'
+    this.tabs.push(next)
+    this.activeTabId = next.id
+    this.transitioning = true
+    const wasApplying = this.applying
+    this.applying = true
+    let imported = false
+    try {
+      imported = this.presenter.applyImportedData(data, name)
+      if (!imported) return false
+      this.loaded(source, name || this.presenter.getStructogramName(), file)
+      this.captureActive()
+      if (replaceEmpty) this.tabs.splice(this.tabs.indexOf(previous), 1)
+      return true
+    } finally {
+      if (!imported) {
+        this.tabs.splice(this.tabs.indexOf(next), 1)
+        this.activeTabId = previous.id
+        this.current = previous.document
+        this.presenter.restoreDocument(previous.snapshot)
+      }
+      this.applying = wasApplying
+      this.transitioning = false
+      this.refresh()
+      this.persistWorkspace()
+    }
+  }
+
+  closeTab (id) {
+    if (this.busy || this.transitioning) return
+    this.commitEditor()
+    this.captureActive()
+    const index = this.tabs.findIndex(tab => tab.id === id)
+    if (index < 0) return
+    const tab = this.tabs[index]
+    if (tab.document.isDirty(tab.snapshot.payload) && !window.confirm(t('tabs.discard', { name: tab.document.name }))) return
+    if (this.tabs.length === 1) {
+      this.newDiagram()
+    } else if (id === this.activeTabId) {
+      this.activateTab(this.tabs[index + 1]?.id || this.tabs[index - 1].id)
+    }
+    this.tabs.splice(this.tabs.indexOf(tab), 1)
+    this.refresh()
+    this.persistWorkspace()
+  }
+
+  persistWorkspace () {
+    if (!this.initialized || this.transitioning || !workspacePersistenceEnabled()) return
+    this.captureActive()
+    const tabs = this.tabs.map(tab => ({
+      name: tab.document.name,
+      source: tab.document.source === 'new' ? 'new' : 'local',
+      saved: tab.document.saved,
+      payload: tab.snapshot.payload
+    }))
+    storage.setItem('struktog_open_tabs', JSON.stringify({ tabs, active: this.tabs.findIndex(tab => tab.id === this.activeTabId) }))
+  }
+
+  restoreWorkspace () {
+    try {
+      const workspace = JSON.parse(storage.getItem('struktog_open_tabs') || 'null')
+      if (workspace && Array.isArray(workspace.tabs) && workspace.tabs.length &&
+        workspace.tabs.every(tab => tab && typeof tab.name === 'string' && typeof tab.saved === 'string' &&
+          typeof tab.payload?.meta?.structoName === 'string' && tab.payload.settings && validDiagram(tab.payload))) {
+        const tabs = workspace.tabs.map(saved => {
+          const state = new DocumentState(saved.source === 'new' ? 'new' : 'local', saved.name, saved.payload)
+          state.saved = saved.saved
+          return this.createTab(state, { payload: saved.payload, undo: [], redo: [], selectedUid: null })
+        })
+        this.tabs = tabs
+        const selected = Number.isInteger(workspace.active) ? workspace.active : 0
+        const active = tabs[selected] || tabs[0]
+        this.activeTabId = active.id
+        this.current = active.document
+        this.transitioning = true
+        this.presenter.restoreDocument(active.snapshot)
+      }
+    } catch (error) { /* Invalid recovery data must not prevent the editor from opening. */ } finally {
+      this.transitioning = false
+      this.initialized = true
+      this.refresh()
+      this.persistWorkspace()
+    }
   }
 
   recentFiles () {
@@ -300,11 +457,13 @@ export class DocumentController {
 
   loaded (source, name, file = null) {
     this.current = new DocumentState(source, name, this.presenter.getExportPayload(), file)
+    this.activeTab().document = this.current
     if (source === 'google-drive') {
       this.remember(file)
       this.enrichRecentPath(file)
     }
     this.refresh()
+    this.persistWorkspace()
   }
 
   download () {
@@ -355,6 +514,8 @@ export class DocumentController {
   }
 
   open (id = null) {
+    const existing = id && this.tabs.find(tab => tab.document.file?.id === id)
+    if (existing) return this.activateTab(existing.id)
     if (!this.activated) return requestGoogleActivation(this, () => this.open(id))
     return this.run(async (token, signal) => {
       let selected
@@ -368,15 +529,12 @@ export class DocumentController {
         }
       }
       if (!selected) return
+      const existing = this.tabs.find(tab => tab.document.file?.id === selected.id)
+      if (existing) return this.activateTab(existing.id, true)
       const { file, content } = await this.files.open(selected.id)
       let data
       try { data = JSON.parse(content) } catch (error) { throw new Error(t('importExport.invalidJson')) }
-      if (this.dirty() && !window.confirm(t('drive.discard'))) return
-      this.applying = true
-      try {
-        if (!this.presenter.applyImportedData(data, file.name)) throw new Error(t('importExport.unknownImportFormat'))
-        this.loaded('google-drive', file.name, file)
-      } finally { this.applying = false }
+      if (!this.importDiagram(data, file.name, 'google-drive', file)) throw new Error(t('importExport.unknownImportFormat'))
     })
   }
 
@@ -427,13 +585,67 @@ export class DocumentController {
     submit.type = 'submit'
     submit.className = 'document-button document-button-primary'
     submit.textContent = t('toolbar.saveDrive')
+    const newFolder = document.createElement('button')
+    newFolder.type = 'button'
+    newFolder.className = 'document-button'
+    newFolder.textContent = t('toolbar.newFolder')
+    const folderControls = document.createElement('div')
+    folderControls.className = 'document-new-folder'
+    folderControls.id = 'drive-new-folder-controls'
+    newFolder.setAttribute('aria-controls', folderControls.id)
+    folderControls.hidden = true
+    const folderLabel = document.createElement('label')
+    folderLabel.htmlFor = 'drive-new-folder-name'
+    folderLabel.textContent = t('toolbar.folderName')
+    const folderInput = document.createElement('input')
+    folderInput.id = 'drive-new-folder-name'
+    const createFolder = document.createElement('button')
+    createFolder.type = 'button'
+    createFolder.className = 'document-button'
+    createFolder.textContent = t('toolbar.createFolder')
+    const folderError = document.createElement('p')
+    folderError.className = 'document-error'
+    folderError.setAttribute('role', 'alert')
+    folderError.hidden = true
+    for (const element of [folderLabel, folderInput, createFolder, folderError]) folderControls.appendChild(element)
+    newFolder.addEventListener('click', () => {
+      folderControls.hidden = !folderControls.hidden
+      newFolder.setAttribute('aria-expanded', String(!folderControls.hidden))
+      if (!folderControls.hidden) folderInput.focus()
+    })
+    newFolder.setAttribute('aria-expanded', 'false')
+    createFolder.addEventListener('click', async () => {
+      if (this.busy) return
+      if (!folderInput.value.trim()) { folderInput.focus(); return }
+      folderError.hidden = true
+      for (const element of [submit, newFolder, folderInput, createFolder]) element.disabled = true
+      const created = await this.run(() => this.files.createFolder(folderInput.value, folder.id))
+      if (!dialog.isConnected) return
+      for (const element of [submit, newFolder, folderInput, createFolder]) element.disabled = false
+      if (created) {
+        folder = created
+        destination.textContent = t('toolbar.destination', { name: folder.name })
+        folderInput.value = ''
+        folderControls.hidden = true
+        newFolder.setAttribute('aria-expanded', 'false')
+        input.focus()
+      } else {
+        folderError.textContent = this.error || t('toolbar.folderCreateFailed')
+        folderError.hidden = false
+        folderInput.focus()
+      }
+    })
+    folderInput.addEventListener('keydown', event => {
+      if (event.key === 'Enter') { event.preventDefault(); createFolder.click() }
+    })
     footer.appendChild(cancel)
     footer.appendChild(submit)
-    for (const element of [heading, description, destination, label, input, footer]) form.appendChild(element)
+    for (const element of [heading, description, destination, newFolder, folderControls, label, input, footer]) form.appendChild(element)
     dialog.appendChild(form)
     document.body.appendChild(dialog)
     form.addEventListener('submit', event => {
       event.preventDefault()
+      if (this.busy) return
       if (!input.value.trim()) { input.focus(); return }
       const name = input.value.trim()
       dialog.close()
@@ -481,8 +693,10 @@ export class DocumentController {
       savedState.name = file.name
       savedState.file = file
       this.current = savedState
+      this.activeTab().document = savedState
       this.remember(file)
       this.enrichRecentPath(file, parentId ? { id: parentId, name: folderName } : null)
+      this.persistWorkspace()
     })
   }
 }

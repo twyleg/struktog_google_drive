@@ -1,6 +1,6 @@
 // Only this preference record is read before optional storage is enabled.
 const CHOICE_KEY = 'struktog_privacy_choices_v1'
-const APP_KEYS = new Set(['tree', 'lang', 'displaySourcecode', 'struktog_code', 'struktog_structogram_name', 'struktog_settings_ui_language', 'struktog_settings_shortcuts', 'struktog_settings_profile', 'struktog_settings_elements', 'struktog_settings_colors', 'struktog_settings_function_insert_top_only', 'struktog_tour_hint_seen_v1', 'struktog_drive_recent'])
+const APP_KEYS = new Set(['tree', 'lang', 'displaySourcecode', 'struktog_code', 'struktog_structogram_name', 'struktog_diagram_headline', 'struktog_settings_ui_language', 'struktog_settings_theme', 'struktog_settings_shortcuts', 'struktog_settings_profile', 'struktog_settings_elements', 'struktog_settings_colors', 'struktog_settings_function_insert_top_only', 'struktog_tour_hint_seen_v1', 'struktog_drive_recent', 'struktog_open_tabs'])
 const memory = new Map()
 let choices = { workspace: false, offline: false }
 function deviceStorage () {

@@ -7,48 +7,48 @@ export class WebTour {
     this.steps = [
       {
         selector: ".webtour-intro-anchor",
-        title: t("webtour.titleIntro"),
-        text: t("webtour.textIntro"),
+        titleKey: "webtour.titleIntro",
+        textKey: "webtour.textIntro",
       },
       {
         selector: "#tourInfoButton",
-        title: t("webtour.titleStart"),
-        text: t("webtour.textStart"),
+        titleKey: "webtour.titleStart",
+        textKey: "webtour.textStart",
       },
       {
         selector: "#structoName",
-        title: t("webtour.titleNaming"),
-        text: t("webtour.textNaming"),
+        titleKey: "webtour.titleNaming",
+        textKey: "webtour.textNaming",
       },
       {
         selector: "#insertButtons",
-        title: t("webtour.titleInsert"),
-        text: t("webtour.textInsert"),
+        titleKey: "webtour.titleInsert",
+        textKey: "webtour.textInsert",
       },
       {
         selector: "#structogram",
-        title: t("webtour.titleWorkspace"),
-        text: t("webtour.textWorkspace"),
+        titleKey: "webtour.titleWorkspace",
+        textKey: "webtour.textWorkspace",
       },
       {
         selector: ".optionContainer",
-        title: t("webtour.titleElementOptions"),
-        text: t("webtour.textElementOptions"),
+        titleKey: "webtour.titleElementOptions",
+        textKey: "webtour.textElementOptions",
       },
       {
         selector: "#optionButtonsGroup",
-        title: t("webtour.titleFileSettings"),
-        text: t("webtour.textFileSettings"),
+        titleKey: "webtour.titleFileSettings",
+        textKey: "webtour.textFileSettings",
       },
       {
         selector: "#struktoOptions1, #struktoOptions2",
-        title: t("webtour.titleHistory"),
-        text: t("webtour.textHistory"),
+        titleKey: "webtour.titleHistory",
+        textKey: "webtour.textHistory",
       },
       {
         selector: ".ToggleSourcecode",
-        title: t("webtour.titleSourcecode"),
-        text: t("webtour.textSourcecode"),
+        titleKey: "webtour.titleSourcecode",
+        textKey: "webtour.textSourcecode",
       },
     ];
 
@@ -153,6 +153,7 @@ export class WebTour {
     this.backButton.type = "button";
     this.backButton.classList.add("webtour-button");
     this.backButton.appendChild(document.createTextNode(t("webtour.back")));
+    this.backButton.dataset.i18n = "webtour.back";
     this.backButton.addEventListener("click", () => this.previousStep());
 
     this.nextButton = document.createElement("button");
@@ -164,6 +165,7 @@ export class WebTour {
     closeButton.type = "button";
     closeButton.classList.add("webtour-button");
     closeButton.appendChild(document.createTextNode(t("webtour.finish")));
+    closeButton.dataset.i18n = "webtour.finish";
     closeButton.addEventListener("click", () => this.stop());
 
     controls.appendChild(this.backButton);
@@ -204,8 +206,8 @@ export class WebTour {
     this.clearHighlight();
 
     const step = this.steps[this.currentStepIndex];
-    this.titleNode.textContent = step.title;
-    this.textNode.textContent = step.text;
+    this.titleNode.textContent = t(step.titleKey);
+    this.textNode.textContent = t(step.textKey);
     this.progressNode.textContent =
       String(this.currentStepIndex + 1) + " / " + String(this.steps.length);
 

@@ -29,10 +29,11 @@ async function privacy(initial={}, extras={}) {
 }
 
 test('no workspace data is read or persisted before a storage choice',async()=>{
-  const {api,data,reads,writes}=await privacy({tree:'old diagram',struktog_drive_recent:'private filenames'});
+  const {api,data,reads,writes}=await privacy({tree:'old diagram',struktog_drive_recent:'private filenames',struktog_open_tabs:'private tabs'});
   assert.deepEqual(reads,[CHOICE]);
   assert.equal(api.storage.getItem('tree'),null);
   assert.equal('tree' in api.storage,false);
+  assert.equal(api.storage.getItem('struktog_open_tabs'),null);
   api.storage.tree='current diagram';
   api.storage.setItem('struktog_code','current code');
   assert.equal(api.storage.tree,'current diagram');
@@ -46,6 +47,7 @@ test('enabling storage persists the active session and restores it on later visi
   const p=await privacy();
   p.api.storage.tree='diagram';
   p.api.storage.lang='Python';
+  p.api.storage.struktog_open_tabs='all open tabs';
   assert.equal(p.api.setWorkspacePersistence(true),true);
   assert.equal(p.data.get('tree'),'diagram');
   p.api.storage.setItem('struktog_drive_recent','[]');
@@ -53,17 +55,20 @@ test('enabling storage persists the active session and restores it on later visi
   assert.equal(later.api.workspacePersistenceEnabled(),true);
   assert.equal(later.api.storage.tree,'diagram');
   assert.equal(later.api.storage.lang,'Python');
+  assert.equal(later.api.storage.struktog_open_tabs,'all open tabs');
 });
 
 test('withdrawal deletes saved workspace data but preserves the current tab and unrelated data',async()=>{
-  const p=await privacy({[CHOICE]:JSON.stringify({workspace:true,offline:false}),tree:'saved diagram',struktog_code:'saved code',unrelated:'keep'});
+  const p=await privacy({[CHOICE]:JSON.stringify({workspace:true,offline:false}),tree:'saved diagram',struktog_code:'saved code',struktog_open_tabs:'all open tabs',unrelated:'keep'});
   p.api.storage.tree='edited diagram';
   p.api.setWorkspacePersistence(false);
   assert.equal(p.data.has('tree'),false);
   assert.equal(p.data.has('struktog_code'),false);
+  assert.equal(p.data.has('struktog_open_tabs'),false);
   assert.equal(p.data.get('unrelated'),'keep');
   assert.equal(p.api.storage.tree,'edited diagram');
   assert.equal(p.api.storage.getItem('struktog_code'),'saved code');
+  assert.equal(p.api.storage.struktog_open_tabs,'all open tabs');
   const later=await privacy(Object.fromEntries(p.data));
   assert.equal(later.api.workspacePersistenceEnabled(),false);
   assert.equal(later.api.storage.tree,null);
@@ -164,4 +169,65 @@ test('Google activation needs an explicit choice and a separate continuation ges
   assert.equal(continued,1);
   assert.equal(stopped,2,'Activation clicks must not bubble into the toolbar outside-click handler');
   assert.equal(controller.activationDialog,null);
+});
+
+async function themed(initial={}) {
+  const p=await privacy(initial);
+  const listeners=[];
+  const media={matches:true,addEventListener:(event,listener)=>listeners.push(listener)};
+  const root={dataset:{}};
+  const browserColor={content:''};
+  p.context.window.matchMedia=()=>media;
+  p.context.document={documentElement:root,querySelector:()=>browserColor};
+  const module=await p.load('src/helpers/theme.js');
+  await module.evaluate();
+  return {...p,theme:module.namespace,media,listeners,root,browserColor};
+}
+
+test('system theme follows the OS; explicit choices override it without writing before consent',async()=>{
+  const p=await themed();
+  p.theme.initializeTheme();
+  assert.equal(p.root.dataset.theme,'dark');
+  assert.equal(p.browserColor.content,'#111b22');
+  p.media.matches=false;p.listeners[0]();
+  assert.equal(p.root.dataset.theme,'light');
+  p.theme.setThemePreference('dark');
+  p.listeners[0]();
+  assert.equal(p.root.dataset.theme,'dark');
+  assert.equal(p.api.storage.struktog_settings_theme,'dark');
+  assert.deepEqual(p.writes,[]);
+  p.theme.setThemePreference('invalid');
+  assert.equal(p.root.dataset.theme,'dark');
+  p.theme.setThemePreference('system');
+  assert.equal(p.root.dataset.theme,'light');
+  p.theme.initializeTheme();
+  assert.equal(p.listeners.length,1,'Theme initialization must not duplicate OS listeners');
+});
+
+test('theme preference persists only with workspace consent and is removed on withdrawal',async()=>{
+  const p=await themed();
+  p.theme.initializeTheme();
+  p.theme.setThemePreference('light');
+  assert.equal(p.data.has('struktog_settings_theme'),false);
+  p.api.setWorkspacePersistence(true);
+  assert.equal(p.data.get('struktog_settings_theme'),'light');
+  const later=await themed(Object.fromEntries(p.data));
+  later.theme.initializeTheme();
+  assert.equal(later.root.dataset.theme,'light','Saved explicit preference overrides a dark OS');
+  later.api.setWorkspacePersistence(false);
+  assert.equal(later.data.has('struktog_settings_theme'),false);
+  assert.equal(later.root.dataset.theme,'light','Withdrawal keeps the current theme until the session ends');
+  const fresh=await themed(Object.fromEntries(later.data));
+  fresh.theme.initializeTheme();
+  assert.equal(fresh.root.dataset.theme,'dark');
+});
+
+test('unconsented or invalid old theme preferences fall back to the system theme',async()=>{
+  const ignored=await themed({struktog_settings_theme:'light'});
+  ignored.theme.initializeTheme();
+  assert.equal(ignored.root.dataset.theme,'dark');
+  assert.deepEqual(ignored.reads,[CHOICE]);
+  const invalid=await themed({[CHOICE]:JSON.stringify({workspace:true}),struktog_settings_theme:'broken'});
+  invalid.theme.initializeTheme();
+  assert.equal(invalid.root.dataset.theme,'dark');
 });

@@ -7,10 +7,15 @@ const { webcrypto } = require("node:crypto");
 
 async function modules() {
   const alerts = [];
+  const stored = new Map();
   const window = {
     alert: (message) => alerts.push(message),
     confirm: () => false,
     prompt: () => "copy.json",
+    localStorage: {
+      getItem: key => stored.get(key) ?? null,
+      setItem: (key, value) => stored.set(key, value),
+    },
   };
   const context = vm.createContext({
     window,
@@ -29,7 +34,7 @@ async function modules() {
     const source = file.endsWith("/i18n.js")
       ? "export const t = key => key"
       : file.endsWith("/privacy/storage.js")
-        ? "export const storage = { getItem: key => window.localStorage.getItem(key), setItem: (key,value) => window.localStorage.setItem(key,value) }; export const workspacePersistenceEnabled = () => false;"
+        ? "export const storage = { getItem: key => window.localStorage.getItem(key), setItem: (key,value) => window.localStorage.setItem(key,value) }; export const workspacePersistenceEnabled = () => window.persistWorkspace === true;"
         : file.endsWith("/privacy/ui.js")
           ? "export const requestGoogleActivation = controller => { controller.activationRequested = true; };"
           : fs.readFileSync(file, "utf8");
@@ -83,14 +88,28 @@ async function controller() {
   let data = payload();
   let downloads = 0;
   const presenter = {
-    getStructogramName: () => "test",
+    getStructogramName: () => data.meta.structoName,
+    setStructogramName: name => { data.meta.structoName = name; },
     getExportPayload: () => data,
+    undoList: [],
+    redoList: [],
+    captureDocument: () => ({
+      payload: JSON.parse(JSON.stringify(data)),
+      undo: presenter.undoList.slice(), redo: presenter.redoList.slice(), selectedUid: null,
+    }),
+    restoreDocument: snapshot => {
+      data = JSON.parse(JSON.stringify(snapshot.payload));
+      presenter.undoList = snapshot.undo.slice();
+      presenter.redoList = snapshot.redo.slice();
+    },
     downloadLocal: () => {
       downloads++;
     },
     applyImportedData: (value) => {
       if (!m.validDiagram(value)) return false;
       data = value;
+      presenter.undoList = [];
+      presenter.redoList = [];
       return true;
     },
   };
@@ -377,11 +396,12 @@ test("official Picker cancellation resolves without importing or clearing the do
 test('Drive open reuses importer and preserves current diagram on cancellation or corrupt input', async () => {
   const { c, window, alerts, edit } = await controller();
   let action = 'picked';
+  let selectedId = file.id;
   class Builder {
     setDeveloperKey() { return this; } setAppId() { return this; } setOAuthToken() { return this; }
     setOrigin() { return this; } addView() { return this; } setTitle() { return this; }
     setCallback(callback) { this.callback = callback; return this; }
-    build() { return { setVisible: () => this.callback({ action, docs: [{ id: file.id }] }), dispose() {} }; }
+    build() { return { setVisible: () => this.callback({ action, docs: [{ id: selectedId }] }), dispose() {} }; }
   }
   class DocsView {
     setParent(parent) { assert.equal(parent, 'root'); return this; }
@@ -390,21 +410,21 @@ test('Drive open reuses importer and preserves current diagram on cancellation o
   window.location = { origin: 'http://localhost:8081' };
   window.google = { picker: { PickerBuilder: Builder, DocsView, DocsViewMode: { LIST: 'list' }, ViewId: { DOCS: 'docs' }, Action: { CANCEL: 'cancel', PICKED: 'picked' } } };
   let content = JSON.stringify(payload());
-  c.files.open = async id => { assert.equal(id, file.id); return { file, content }; };
+  c.files.open = async id => ({ file: { ...file, id }, content });
   await c.open();
   assert.equal(c.current.file.id, file.id);
   assert.equal(c.current.source, 'google-drive');
   assert.equal(c.dirty(), false);
   edit();
   const previous = c.current;
-  await c.open(); // Default confirmation cancels replacement.
+  await c.open(); // The same Drive file reuses its existing tab.
   assert.equal(c.current, previous);
   assert.equal(c.dirty(), true);
   action = 'cancel';
   await c.open();
   assert.equal(c.current, previous);
   action = 'picked';
-  window.confirm = () => true;
+  selectedId = 'invalid-id';
   content = '{broken';
   await c.open();
   content = JSON.stringify({ tree: {} });
@@ -424,7 +444,7 @@ test('Drive save follows Save As in the toolbar and offers Save As for new/local
     addEventListener(type, callback) { this.listeners[type] = callback; }
   }
   context.HTMLElement = Element;
-  context.document = { createElement: () => new Element(), addEventListener() {} };
+  context.document = { createElement: () => new Element(), getElementById: () => null, addEventListener() {} };
   window.addEventListener = () => {};
   window.confirm = () => { throw new Error('Saving must not ask for overwrite confirmation'); };
   c.configured = true;
@@ -471,7 +491,7 @@ test('Ctrl+S and Cmd+S commit the active field and save the current Drive file',
   context.HTMLElement = Element;
   context.document = {
     activeElement: new Element(),
-    createElement: () => new Element(),
+    createElement: () => new Element(), getElementById: () => null,
     addEventListener: (type, callback) => { listeners[type] = callback; }
   };
   window.addEventListener = () => {};
@@ -532,25 +552,26 @@ test('recent Drive files persist by ID in most-recent order and storage failures
   assert.doesNotThrow(() => c.remember(file));
 });
 
-test('new diagram respects unsaved-change cancellation and detaches the Drive file', async () => {
+test('new diagram opens a separate tab and preserves unsaved Drive work', async () => {
   const { c, edit, window } = await controller();
   c.loaded('google-drive', file.name, file);
+  const first = c.activeTabId;
   edit();
-  let resets = 0;
-  c.presenter.resetModel = () => { resets++; };
-  c.presenter.setStructogramName = () => {};
+  c.presenter.undoList = ['old-history'];
+  window.confirm = () => { throw new Error('New must not discard the previous document'); };
   c.newDiagram();
-  assert.equal(resets, 0);
-  assert.equal(c.current.file.id, file.id);
-  window.confirm = () => true;
-  c.newDiagram();
-  assert.equal(resets, 1);
+  assert.equal(c.tabs.length, 2);
   assert.equal(c.current.source, 'new');
   assert.equal(c.current.file, null);
   assert.equal(c.dirty(), false);
+  assert.equal(c.presenter.undoList.length, 0);
+  c.activateTab(first);
+  assert.equal(c.current.file.id, file.id);
+  assert.equal(c.dirty(), true);
+  assert.deepEqual(c.presenter.undoList, ['old-history']);
   c.busy = true;
   c.newDiagram();
-  assert.equal(resets, 1);
+  assert.equal(c.tabs.length, 2);
 });
 
 test('named Drive Save As creates a new file and keeps edits during upload dirty', async () => {
@@ -890,4 +911,295 @@ test('Drive Save As asks for activation before authorizing or opening Picker', a
   assert.equal(c.activationRequested,true);
   assert.equal(authorized,0);
   assert.equal(c.busy,false);
+});
+
+test('local tabs isolate content, dirty state, selection history and invalid imports', async () => {
+  const { c, edit } = await controller();
+  c.importDiagram(payload(), 'first.json');
+  const first = c.activeTabId;
+  assert.equal(c.tabs.length, 1, 'The initial empty tab is replaced');
+  edit();
+  c.presenter.undoList = ['first-undo'];
+  c.presenter.redoList = ['first-redo'];
+  const second = payload();
+  second.meta.structoName = 'second';
+  c.importDiagram(second, 'second.json');
+  assert.equal(c.tabs.length, 2);
+  assert.equal(c.dirty(), false);
+  assert.equal(c.hasUnsavedChanges(), true, 'Inactive unsaved work must trigger the browser exit warning');
+  assert.equal(c.presenter.undoList.length, 0);
+  const active = c.activeTabId;
+  assert.equal(c.importDiagram({ tree: {} }, 'broken.json'), false);
+  assert.equal(c.activeTabId, active);
+  assert.equal(c.tabs.length, 2);
+  c.activateTab(first);
+  assert.equal(c.presenter.getExportPayload().meta.structoName, 'test edited');
+  assert.equal(c.dirty(), true);
+  assert.deepEqual(c.presenter.undoList, ['first-undo']);
+  assert.deepEqual(c.presenter.redoList, ['first-redo']);
+  c.activateTab(active);
+  assert.equal(c.presenter.getStructogramName(), 'second');
+  assert.equal(c.presenter.undoList.length, 0);
+});
+
+test('closing tabs confirms only unsaved work and closing the last tab leaves one new diagram', async () => {
+  const { c, edit, window } = await controller();
+  edit();
+  const first = c.activeTabId;
+  c.newDiagram();
+  const second = c.activeTabId;
+  c.closeTab(first); // Default confirmation cancels.
+  assert.equal(c.tabs.length, 2);
+  assert.equal(c.activeTabId, second);
+  window.confirm = () => true;
+  c.closeTab(first);
+  assert.equal(c.tabs.length, 1);
+  assert.equal(c.activeTabId, second);
+  c.closeTab(second);
+  assert.equal(c.tabs.length, 1);
+  assert.notEqual(c.activeTabId, second);
+  assert.equal(c.current.source, 'new');
+  assert.equal(c.dirty(), false);
+  c.importDiagram(payload(), 'last.json');
+  const selected = c.activeTabId;
+  c.closeTab(selected);
+  assert.equal(c.tabs.length, 1);
+  assert.notEqual(c.activeTabId, selected);
+});
+
+test('each Drive tab saves to its own file and reopening an open ID preserves edits', async () => {
+  const { c, edit } = await controller();
+  let reads = 0;
+  c.files.open = async id => { reads++; return { file: { ...file, id, name: id + '.json' }, content: JSON.stringify(payload()) }; };
+  await c.open('drive-one');
+  const first = c.activeTabId;
+  edit();
+  await c.open('drive-two');
+  const second = c.activeTabId;
+  const updates = [];
+  c.files.update = async original => { updates.push(original.id); return { ...original, version: '2' }; };
+  await c.save();
+  await c.open('drive-one');
+  assert.equal(c.activeTabId, first);
+  assert.equal(c.dirty(), true);
+  assert.equal(reads, 2, 'Already-open files must not be downloaded over existing work');
+  await c.save();
+  assert.equal(c.dirty(), false);
+  c.activateTab(second);
+  assert.equal(c.current.file.id, 'drive-two');
+  assert.deepEqual(updates, ['drive-two', 'drive-one']);
+});
+
+test('tab switches and closes are blocked during a Drive upload', async () => {
+  const { c } = await controller();
+  c.importDiagram(payload(), file.name, 'google-drive', file);
+  const first = c.activeTabId;
+  c.newDiagram();
+  const second = c.activeTabId;
+  c.activateTab(first);
+  let complete;
+  c.files.update = () => new Promise(resolve => { complete = resolve; });
+  const saving = c.save();
+  await new Promise(resolve => setImmediate(resolve));
+  c.activateTab(second);
+  c.closeTab(first);
+  assert.equal(c.activeTabId, first);
+  assert.equal(c.tabs.length, 2);
+  complete(file);
+  await saving;
+  c.activateTab(second);
+  assert.equal(c.activeTabId, second);
+});
+
+test('failed imports roll back to the current tab without losing content or undo history', async () => {
+  const { c, edit } = await controller();
+  edit();
+  c.presenter.undoList = ['keep'];
+  const first = c.activeTabId;
+  c.presenter.applyImportedData = () => { c.presenter.setStructogramName('half imported'); throw new Error('import failed'); };
+  assert.throws(() => c.importDiagram(payload(), 'broken.json'), /import failed/);
+  assert.equal(c.tabs.length, 1);
+  assert.equal(c.activeTabId, first);
+  assert.equal(c.presenter.getStructogramName(), 'test edited');
+  assert.deepEqual(c.presenter.undoList, ['keep']);
+  assert.equal(c.dirty(), true);
+  assert.equal(c.transitioning, false);
+});
+
+test('workspace recovery restores all tabs and unsaved flags without retaining live Drive associations', async () => {
+  const { c, edit, window } = await controller();
+  window.persistWorkspace = true;
+  c.restoreWorkspace();
+  c.importDiagram(payload(), 'drive.json', 'google-drive', file);
+  const first = c.activeTabId;
+  edit();
+  c.newDiagram();
+  c.persistWorkspace();
+  const saved = window.localStorage.getItem('struktog_open_tabs');
+  assert.ok(saved);
+  assert.equal(saved.includes(file.id), false, 'Drive association is confined to the running app');
+  const restored = await controller();
+  restored.window.persistWorkspace = true;
+  restored.window.localStorage.setItem('struktog_open_tabs', saved);
+  restored.c.restoreWorkspace();
+  assert.equal(restored.c.tabs.length, 2);
+  assert.equal(restored.c.current.source, 'new');
+  restored.c.activateTab(restored.c.tabs[0].id);
+  assert.equal(restored.c.current.source, 'local');
+  assert.equal(restored.c.current.file, null);
+  assert.equal(restored.c.presenter.getStructogramName(), 'test edited');
+  assert.equal(restored.c.dirty(), true);
+  c.activateTab(first);
+  assert.equal(c.current.file.id, file.id, 'The original running tab keeps its Drive association');
+});
+
+test('session-only tabs do not serialize workspace data and corrupt recovery keeps the existing diagram', async () => {
+  const { c, window } = await controller();
+  c.restoreWorkspace();
+  c.newDiagram();
+  c.persistWorkspace();
+  assert.equal(window.localStorage.getItem('struktog_open_tabs'), null);
+  const restored = await controller();
+  restored.window.persistWorkspace = true;
+  restored.window.localStorage.setItem('struktog_open_tabs', JSON.stringify({ tabs: [{ name: 'bad', saved: '', payload: {tree: {}} }] }));
+  restored.c.restoreWorkspace();
+  assert.equal(restored.c.tabs.length, 1);
+  assert.equal(restored.c.presenter.getStructogramName(), 'test');
+});
+
+test('creating a Drive folder uses the selected parent, shared-drive support, and metadata-only JSON', async () => {
+  const { DriveFiles } = await modules();
+  let requests = 0;
+  const files = new DriveFiles({ token: 'token' }, async (url, options) => {
+    requests++;
+    assert.equal(new URL(url).origin, 'https://www.googleapis.com');
+    assert.equal(new URL(url).pathname, '/drive/v3/files');
+    assert.equal(new URL(url).searchParams.get('supportsAllDrives'), 'true');
+    assert.equal(options.method, 'POST');
+    assert.equal(options.headers.Authorization, 'Bearer token');
+    assert.deepEqual(JSON.parse(options.body), {
+      name: 'Lessons', mimeType: 'application/vnd.google-apps.folder', parents: ['chosen-parent'],
+    });
+    return response({ id: 'new-folder', name: 'Lessons', parents: ['chosen-parent'] });
+  });
+  assert.equal((await files.createFolder(' Lessons ', 'chosen-parent')).id, 'new-folder');
+  await assert.rejects(files.createFolder('  ', 'chosen-parent'), /folderNameRequired/);
+  await assert.rejects(files.createFolder('Lessons', ''), /invalidFolder/);
+  assert.equal(requests, 1);
+});
+
+test('folder creation reports Drive errors and rejects a missing folder ID', async () => {
+  const { DriveFiles } = await modules();
+  const denied = new DriveFiles({ token: 'token' }, async () => response({}, 403));
+  await assert.rejects(denied.createFolder('Lessons', 'parent'), /denied access/);
+  const invalid = new DriveFiles({ token: 'token' }, async () => response({ name: 'Lessons' }));
+  await assert.rejects(invalid.createFolder('Lessons', 'parent'), /invalidFolder/);
+});
+
+async function saveFolderDialog() {
+  const setup = await controller();
+  const elements = [];
+  class Element {
+    constructor(tag) { this.tag = tag; this.children = []; this.listeners = {}; this.isConnected = true; this.value = ''; }
+    appendChild(child) { this.children.push(child); }
+    setAttribute() {}
+    addEventListener(type, listener) { this.listeners[type] = listener; }
+    focus() {}
+    setSelectionRange() {}
+    showModal() { this.open = true; }
+    close() { this.open = false; this.listeners.close?.(); }
+    remove() { this.isConnected = false; }
+    click() { if (!this.disabled) return this.listeners.click?.(); }
+  }
+  setup.context.document = {
+    createElement: tag => { const element = new Element(tag); elements.push(element); return element; },
+    body: new Element('body'),
+  };
+  setup.c.refresh = () => {};
+  setup.c.configured = true;
+  setup.c.saveAsButton = new Element('button');
+  setup.c.openSaveAsDialog({ id: 'parent', name: 'Parent' });
+  return { ...setup, elements, byId: id => elements.find(element => element.id === id), button: key => elements.find(element => element.textContent === 'toolbar.' + key) };
+}
+
+test('Save As creates a subfolder, uses it for saving, and prevents concurrent submissions', async () => {
+  const { c, elements, byId, button } = await saveFolderDialog();
+  let finish;
+  let folders = 0;
+  c.files.createFolder = (name, parent) => {
+    folders++;
+    assert.equal(name, 'Lessons');
+    assert.equal(parent, 'parent');
+    return new Promise(resolve => { finish = resolve; });
+  };
+  let saved;
+  c.save = (...args) => { saved = args; };
+  button('newFolder').click();
+  byId('drive-new-folder-name').value = 'Lessons';
+  const pending = button('createFolder').click();
+  const form = elements.find(element => element.tag === 'form');
+  form.listeners.submit({ preventDefault() {} });
+  assert.equal(saved, undefined);
+  assert.equal(button('saveDrive').disabled, true);
+  assert.equal(button('createFolder').disabled, true);
+  // Authorization completes before the API call.
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(folders, 1);
+  finish({ id: 'created-folder', name: 'Lessons' });
+  await pending;
+  assert.equal(button('saveDrive').disabled, false);
+  assert.equal(elements.find(element => element.className === 'document-save-destination').textContent, 'toolbar.destination');
+  byId('drive-save-name').value = 'lesson.json';
+  form.listeners.submit({ preventDefault() {} });
+  assert.deepEqual(saved, [true, 'lesson.json', 'created-folder', 'Lessons']);
+});
+
+test('failed folder creation stays in Save As and cancellation never creates a folder', async () => {
+  const { c, elements, byId, button } = await saveFolderDialog();
+  let calls = 0;
+  c.files.createFolder = async () => { calls++; throw new Error('Permission denied'); };
+  button('newFolder').click();
+  // Empty folder names do not trigger requests.
+  await button('createFolder').click();
+  assert.equal(calls, 0);
+  byId('drive-new-folder-name').value = 'Lessons';
+  await button('createFolder').click();
+  assert.equal(calls, 1);
+  assert.equal(c.nameDialog.open, true);
+  const error = elements.find(element => element.className === 'document-error');
+  assert.equal(error.textContent, 'Permission denied');
+  assert.equal(error.hidden, false);
+  assert.equal(button('saveDrive').disabled, false);
+  elements.find(element => element.textContent === 'common.cancel').click();
+  assert.equal(c.nameDialog, null);
+  assert.equal(calls, 1);
+});
+
+test('optional headline metadata is backward compatible and validates its type', async () => {
+  const { validDiagram } = await modules();
+  const original = payload();
+  assert.equal(validDiagram(original), true);
+  assert.equal(validDiagram({ ...original, meta: { ...original.meta, headline: '' } }), true);
+  assert.equal(validDiagram({ ...original, meta: { ...original.meta, headline: 'Algorithm A' } }), true);
+  assert.equal(validDiagram({ ...original, meta: { ...original.meta, headline: 42 } }), false);
+  assert.equal(validDiagram(tree()), true);
+});
+
+test('new diagrams start with an empty headline without changing another tab headline', async () => {
+  const { c } = await controller();
+  c.presenter.getExportPayload().meta.headline = 'First headline';
+  c.newDiagram();
+  assert.equal(c.presenter.getExportPayload().meta.headline, '');
+  c.activateTab(c.tabs[0].id);
+  assert.equal(c.presenter.getExportPayload().meta.headline, 'First headline');
+});
+
+
+test('empty headline metadata does not mark legacy documents as modified', async () => {
+  const { c } = await controller();
+  c.presenter.getExportPayload().meta.headline = '';
+  assert.equal(c.dirty(), false);
+  c.presenter.getExportPayload().meta.headline = 'A separate headline';
+  assert.equal(c.dirty(), true);
+  assert.equal(c.presenter.getStructogramName(), 'test');
 });

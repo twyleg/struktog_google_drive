@@ -2,6 +2,7 @@
 export function validDiagram (data) {
   if (!data || typeof data !== 'object' || Array.isArray(data)) return false
   if (data.formatVersion !== undefined && data.formatVersion !== 2) return false
+  if (data.meta?.headline !== undefined && typeof data.meta.headline !== 'string') return false
   const object = value => value && typeof value === 'object' && !Array.isArray(value)
   if (data.settings !== undefined && data.settings !== null) {
     if (!object(data.settings)) return false

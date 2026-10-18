@@ -1,6 +1,8 @@
 // exportedAt changes on every serialization and is not an edit.
 export function fingerprint (payload) {
-  const { exportedAt, ...meta } = payload.meta || {}
+  const { exportedAt, headline, ...meta } = payload.meta || {}
+  // An absent headline in an older file is equivalent to an empty one.
+  if (headline) meta.headline = headline
   return JSON.stringify({ ...payload, meta })
 }
 

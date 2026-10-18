@@ -45,6 +45,7 @@ export class CodeView {
     const sourcecodeTitle = document.createElement("strong");
     sourcecodeTitle.classList.add("sourcecodeLabel");
     sourcecodeTitle.appendChild(document.createTextNode(t("code.translateTo")));
+    sourcecodeTitle.dataset.i18n = "code.translateTo";
     const sourcecodeForm = document.createElement("div");
     sourcecodeForm.classList.add("sourcecodeSelectWrap");
     const sourcecodeSelect = document.createElement("select");
@@ -66,6 +67,7 @@ export class CodeView {
 
     const sourcecodeCopy = document.createElement("div");
     sourcecodeCopy.setAttribute("data-tooltip", t("code.copyCode"));
+    sourcecodeCopy.dataset.i18nTooltip = "code.copyCode";
     sourcecodeCopy.classList.add(
       "sourcecodeCopyButton",
       "copyIcon",
@@ -170,6 +172,7 @@ export class CodeView {
       "ToggleSourcecode"
     );
     option.setAttribute("data-tooltip", t("code.showSourcecode"));
+    option.dataset.i18nTooltip = "code.showSourcecode";
     option.addEventListener("click", (event) =>
       presenter.alterSourcecodeDisplay(event)
     );

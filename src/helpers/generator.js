@@ -136,6 +136,7 @@ export function generateHtmltree(options = {}) {
   const introduction = document.createElement("p");
   introduction.className = "app-introduction";
   introduction.textContent = t("privacy.appDescription");
+  introduction.dataset.i18n = "privacy.appDescription";
   section1.appendChild(introduction);
 
   const section2 = document.createElement("section");
@@ -151,10 +152,6 @@ export function generateHtmltree(options = {}) {
   divOptions.appendChild(divOptionsGroup);
   section2.appendChild(divOptions);
 
-  const divider = document.createElement("div");
-  divider.classList.add("divider");
-  document.body.appendChild(divider);
-
   const structoNameContainer = document.createElement("div");
   structoNameContainer.classList.add("structoNameContainer");
 
@@ -163,18 +160,39 @@ export function generateHtmltree(options = {}) {
   dividerText.innerHTML = t("nav.unnamed");
   dividerText.classList.add("tooltip", "tooltip-top", "hand");
   dividerText.setAttribute("data-tooltip", t("nav.renameTooltip"));
+  dividerText.dataset.i18nTooltip = "nav.renameTooltip";
   dividerText.setAttribute("id", "structoName");
   structoNameContainer.appendChild(dividerText);
-  document.body.appendChild(structoNameContainer);
-
   // main
   const main = document.createElement("main");
+  main.classList.add("document-main");
   document.body.appendChild(main);
+
+  const workspace = document.createElement("section");
+  workspace.className = "document-workspace";
+  main.appendChild(workspace);
+
+  const tabHeader = document.createElement("div");
+  tabHeader.className = "document-tab-header";
+  workspace.appendChild(tabHeader);
+
+  const tabsHost = document.createElement("div");
+  tabsHost.id = "document-tabs-host";
+  tabHeader.appendChild(tabsHost);
+
+  const fileHeader = document.createElement("div");
+  fileHeader.className = "document-file-header";
+  fileHeader.appendChild(structoNameContainer);
+  const fileStatus = document.createElement("div");
+  fileStatus.id = "document-file-status";
+  fileHeader.appendChild(fileStatus);
+  tabHeader.appendChild(fileHeader);
 
   const editor = document.createElement("div");
   editor.classList.add("container");
   editor.setAttribute("id", "editorDisplay");
-  main.appendChild(editor);
+  editor.setAttribute("role", "tabpanel");
+  workspace.appendChild(editor);
 
   const modal = document.createElement("div");
   modal.classList.add("modal");
@@ -251,17 +269,22 @@ export function generateFooter() {
   const sourceLink = document.createElement("a");
   sourceLink.classList.add("hand", "tooltip", "tooltip-top");
   sourceLink.appendChild(document.createTextNode(t("footer.sourceCode")));
+  sourceLink.dataset.i18n = "footer.sourceCode";
   sourceLink.href = __SITE_CONFIG__.sourceUrl || "./terms.html#source";
   sourceLink.target = "_blank";
   sourceLink.rel = "noopener noreferrer";
   sourceLink.classList.add("privacy-footer-link");
   sourceLink.setAttribute("data-tooltip", t("footer.sourceCode"));
+  sourceLink.dataset.i18nTooltip = "footer.sourceCode";
 
   const maintainer = document.createElement("div");
   maintainer.appendChild(document.createTextNode(t("footer.maintainer")));
+  maintainer.dataset.i18n = "footer.maintainer";
 
   const contributorLink = document.createElement("div");
   contributorLink.classList.add("hand", "tooltip", "tooltip-top");
+  contributorLink.dataset.i18n = "footer.contributors";
+  contributorLink.dataset.i18nTooltip = "footer.contributorsTooltip";
   contributorLink.appendChild(
     document.createTextNode(t("footer.contributors"))
   );
@@ -279,6 +302,7 @@ export function generateFooter() {
 
   const hash = document.createElement("div");
   hash.setAttribute("id", "whats-new-link");
+  hash.dataset.i18nTooltip = "footer.whatsNewTooltip";
   hash.classList.add("hand", "tooltip", "tooltip-top");
   hash.appendChild(document.createTextNode(__COMMIT_HASH__));
   hash.setAttribute(
@@ -296,6 +320,7 @@ export function generateFooter() {
   const impressumLink = document.createElement("a");
   impressumLink.classList.add("privacy-footer-link");
   impressumLink.textContent = t("footer.imprint");
+  impressumLink.dataset.i18n = "footer.imprint";
   impressumLink.href = "./imprint.html";
   impressumLink.target = "_blank";
   impressumLink.rel = "noopener noreferrer";
@@ -315,6 +340,7 @@ export function generateFooter() {
     const link = document.createElement("a");
     link.className = "privacy-footer-link";
     link.textContent = t(label);
+    link.dataset.i18n = label;
     link.href = href;
     link.target = "_blank";
     link.rel = "noopener noreferrer";
@@ -326,6 +352,7 @@ export function generateFooter() {
   privacySettings.id = "privacy-settings-link";
   privacySettings.className = "privacy-footer-link";
   privacySettings.textContent = t("privacy.footerSettings");
+  privacySettings.dataset.i18n = "privacy.footerSettings";
   footerSpan.appendChild(privacySettings);
 }
 
@@ -340,6 +367,7 @@ export function generateResetButton(presenter, domNode) {
     "hand"
   );
   resetButtonDiv.setAttribute("data-tooltip", t("common.reset"));
+  resetButtonDiv.dataset.i18nTooltip = "common.reset";
   resetButtonDiv.addEventListener("click", () => {
     const content = document.getElementById("modal-content");
     const footer = document.getElementById("modal-footer");
@@ -376,6 +404,7 @@ export function generateInfoButton(domNode) {
     "hand"
   );
   infoButtonDiv.setAttribute("data-tooltip", t("footer.sourceTooltip"));
+  infoButtonDiv.dataset.i18nTooltip = "footer.sourceTooltip";
   infoButtonDiv.addEventListener("click", () => {
     window.open(
       "https://gitlab.com/dev-ddi/cs-school-tools/struktog",

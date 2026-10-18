@@ -90,10 +90,24 @@ Note: External hosts must allow CORS for browser-side loading.
 
 The toolbar provides **New**, **Open file**, **Save locally**, **Google Drive**,
 **Save to Drive**, **Save as in Drive**, **Export image**, and **Settings**.
+The language selector beside the logo offers browser detection, Deutsch,
+English, Français, and Español. It updates the interface immediately without
+reloading or closing the current diagram. The same choice is available in
+Settings. It lasts for the current tab, and is remembered across visits when
+workspace storage is enabled under **Browser data**.
+
+The appearance selector beside the language selector offers **System**, **Light**,
+and **Dark**. System follows your operating system, including changes while the
+app is open. Your choice is remembered across visits when workspace storage is
+enabled. Elements default to black on white, switching to the theme’s dark
+surface and light text while editing a monochrome diagram in dark mode. Custom color palettes keep their
+authored colors. Saved files and image exports retain their original colors.
+
 Local saves download a JSON copy. **Save to Drive** updates the current Drive file;
 **Save as in Drive** opens Google Picker to choose a destination folder, then
-asks for a filename and creates a new file in that folder. **Save to Drive** is
-available after opening or creating a writable Drive file.
+asks for a filename and creates a new file in that folder. The save dialog also
+offers **New folder** to create a subfolder and use it as the save destination. For a new or local
+diagram, **Save to Drive** also opens that folder and filename flow.
 
 The **Google Drive** dropdown remembers the six most recently opened or saved
 Drive files in this browser and offers **Open another file…** for Google Picker.
@@ -107,6 +121,31 @@ while signed in. Older entries acquire a path when reopened. The status row show
 its location, and whether it has unsaved changes. `Ctrl+S` / `Cmd+S` saves the
 current Drive file or downloads a local copy. Drive actions are disabled when
 Google Drive is not configured.
+
+### Multiple diagrams
+
+The tab strip below the toolbar keeps multiple diagrams open. Tabs and editor
+share a frame; the tab header shows the editable diagram title, file location,
+save state, and browser-storage status. **New** creates a
+new tab. **Open file** accepts one or more local JSON files, and Drive opens in
+a separate tab too. An untouched initial blank tab is reused for the first
+opened file. Selecting an already-open Drive file switches to its existing tab
+without replacing unsaved edits or downloading it again.
+
+Each tab retains its content, title, undo/redo history, code/settings, unsaved
+indicator, and current Drive save destination. Saving or exporting affects the
+active diagram. Interface language remains shared across tabs. Use the close
+button to close a diagram; unsaved changes require confirmation. Closing the
+last diagram leaves a new blank tab. With focus on a tab, use Left/Right or
+Home/End to switch, and Delete to close. Tabs cannot be switched/closed while
+a Drive operation is running.
+
+Without browser storage, open diagrams live only in the current browser tab.
+With workspace storage enabled under **Browser data**, all open diagrams and
+the selected tab are recovered after reload. Undo history and live Drive
+associations remain in memory: recovered Drive diagrams become local copies.
+Reopen the Drive file to reconnect, or save the recovered changes as a new
+Drive copy. The browser exit warning covers unsaved work in inactive tabs too.
 
 ### JSON export
 
@@ -131,12 +170,19 @@ Legacy exports that only contain `tree` are still supported.
 
 ### PNG export
 
-The image export dialog offers PNG/SVG downloads and **Copy PNG** / **Copy SVG**
-for pasting into another application. Clipboard copying requires HTTPS or localhost
-and browser permission. SVG copying is enabled only when the browser supports it;
-the receiving application must also accept SVG. The existing SVG export embeds
-HTML in `foreignObject`, which some applications or clipboard sanitizers may omit;
-use PNG for the most reliable visual result.
+The bold headline field above the diagram is independent of the filename. It
+appears in PNG/SVG previews, downloads and clipboard copies. It is saved in the
+optional `meta.headline` field of the v2 JSON format. Older files without this
+field load with an empty headline. `meta.structoName` remains the separate name
+used for local filenames and suggested Drive/export filenames.
+
+The image export dialog shows a light-mode preview, a filename field and a
+PNG/SVG format selector. **Save as…** downloads the selected format, and
+**Copy PNG** and **Copy SVG** copy the corresponding image to the clipboard.
+The border field sets the white space around the diagram (default: 1 px); it
+applies to the preview, downloads and clipboard copies. Copying requires HTTPS (or
+localhost), browser support and clipboard permission. The existing SVG export
+embeds HTML using `foreignObject`; use PNG for the most reliable compatibility.
 
 ## Development
 
