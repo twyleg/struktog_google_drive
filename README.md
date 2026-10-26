@@ -184,6 +184,14 @@ applies to the preview, downloads and clipboard copies. Copying requires HTTPS (
 localhost), browser support and clipboard permission. The existing SVG export
 embeds HTML using `foreignObject`; use PNG for the most reliable compatibility.
 
+### Common symbols
+
+While editing diagram text, the headline, or function fields, use **Ω ▾**
+to insert arrows, comparisons, and mathematical/logical symbols. The chosen
+symbol replaces the selected text or is inserted at the cursor. Continue
+editing and apply or cancel as usual. The picker supports Tab, Enter/Space,
+and Escape (return to the text field).
+
 ## Development
 
 Useful scripts:

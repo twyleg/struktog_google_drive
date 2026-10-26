@@ -145,6 +145,7 @@ const translations = {
       stableVersion: "stable version",
     },
     editor: {
+      insertSymbol: "Symbol einfügen",
       headline: "Überschrift",
       chooseElement: "Element wählen:",
       heading: "Editor:",
@@ -412,6 +413,7 @@ const translations = {
       stableVersion: "stable version",
     },
     editor: {
+      insertSymbol: "Insert symbol",
       headline: "Headline",
       chooseElement: "Choose element:",
       heading: "Editor:",
@@ -676,6 +678,7 @@ const translations = {
       stableVersion: "la version stable",
     },
     editor: {
+      insertSymbol: "Insérer un symbole",
       headline: "Titre du diagramme",
       chooseElement: "Choisir un élément :",
       heading: "Éditeur :",
@@ -943,6 +946,7 @@ const translations = {
       stableVersion: "la versión estable",
     },
     editor: {
+      insertSymbol: "Insertar símbolo",
       headline: "Encabezado",
       chooseElement: "Elegir elemento:",
       heading: "Editor:",
@@ -1251,6 +1255,11 @@ export function getUiLanguage() {
 }
 
 export function refreshPageTranslations() {
+  for (const element of document.querySelectorAll("[data-i18n-title]")) {
+    element.title = t(element.dataset.i18nTitle);
+    element.setAttribute("aria-label", element.title);
+  }
+
   for (const element of document.querySelectorAll("[data-i18n]")) {
     element.textContent = t(element.dataset.i18n);
   }
