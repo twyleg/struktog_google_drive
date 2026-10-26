@@ -15,6 +15,7 @@
  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createSymbolMenu } from "../helpers/symbolMenu";
 import { config } from "../config.js";
 import { generateResetButton } from "../helpers/generator";
 import { newElement } from "../helpers/domBuilding";
@@ -156,6 +157,7 @@ export class Structogram {
     editorHeadline.value = this.presenter.getDiagramHeadline();
     editorHeadline.setAttribute("aria-label", t("editor.headline"));
     editorHeadline.placeholder = t("editor.headline");
+    const headlineSymbols = createSymbolMenu(editorHeadline);
     editorHeadline.addEventListener("input", () => {
       this.presenter.setDiagramHeadline(editorHeadline.value);
     });
@@ -166,6 +168,7 @@ export class Structogram {
       if (event.key === "Enter") { event.preventDefault(); editorHeadline.blur(); }
     });
     divEditorHeadline.appendChild(editorHeadline);
+    divEditorHeadline.appendChild(headlineSymbols);
 
     const optionsContainer1 = document.createElement("div");
     optionsContainer1.id = "struktoOptions1";
@@ -609,6 +612,7 @@ export class Structogram {
       inputElement.type = "text";
       inputElement.placeholder = placeHolder;
       inputElement.value = content;
+      inputDiv.appendChild(createSymbolMenu(inputElement));
 
       // function for creating the text node (function name or parameter name)
       const createTextNode = () => {
@@ -1886,6 +1890,7 @@ export class Structogram {
     returnTypeInput.placeholder = getContentDefault("returnTypePlaceholder");
     returnTypeInput.value = element.returnType || "";
     returnTypeRow.appendChild(returnTypeInput);
+    returnTypeRow.appendChild(createSymbolMenu(returnTypeInput));
 
     const persistReturnType = () => {
       this.presenter.setFunctionReturnType(uid, returnTypeInput.value);
@@ -1957,6 +1962,7 @@ export class Structogram {
       parameterInput.placeholder = `par ${index + 1}`;
       parameterInput.value = parameter.parName || "";
       parameterItem.appendChild(parameterInput);
+      parameterItem.appendChild(createSymbolMenu(parameterInput));
 
       const persistParameter = () => {
         this.presenter.setFunctionParameter(uid, index, parameterInput.value);
@@ -2183,6 +2189,7 @@ export class Structogram {
     const text = document.createTextNode(content);
 
     editDiv.appendChild(editText);
+    editDiv.appendChild(createSymbolMenu(editText));
     editDiv.appendChild(editApply);
     editDiv.appendChild(editDismiss);
 
